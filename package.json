@@ -1,0 +1,18 @@
+{
+  "name": "pvc",
+  "version": "1.0.0",
+  "description": "Prompt Version Control - Track and analyze AI coding sessions",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "start": "bun src/index.ts",
+    "build": "bun build.ts",
+    "build:windows": "bun build ./src/index.ts --compile --target=bun-windows-x64 --outfile=pvc.exe",
+    "build:linux": "bun build ./src/index.ts --compile --target=bun-linux-x64 --outfile=pvc",
+    "build:mac": "bun build ./src/index.ts --compile --target=bun-darwin-x64 --outfile=pvc"
+  },
+  "keywords": ["pvc", "version-control", "ai", "codex"],
+  "author": "Adam Pukaluk",
+  "license": "MIT"
+}
+

@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+bun.lockb
+
+# Build outputs
+pvc
+pvc.exe
+*.exe
+
+# PVC data
+.pvc/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
