@@ -60,4 +60,5 @@ export interface Checkpoint {
   sessionId: string;
   lastTimestamp: string;
   lastReportAt: string;
+  lastReport: string;
 }

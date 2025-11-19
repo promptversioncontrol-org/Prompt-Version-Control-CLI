@@ -71,11 +71,14 @@ export async function generateReportCommand(
   const patches = extractPatches(events);
   const fileEdits = extractFileEdits(events);
 
+  // Use a single timestamp for this report
+  const nowIso = new Date().toISOString();
+
   // Create report object (only with new events)
   const report: SessionReport = {
     sessionId,
     cwd,
-    generatedAt: new Date().toISOString(),
+    generatedAt: nowIso,
     events,
     userPrompts,
     assistantMessages,
@@ -86,7 +89,7 @@ export async function generateReportCommand(
   };
 
   // Create dedicated folder for this report inside session reports directory
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const timestamp = nowIso.replace(/[:.]/g, "-");
   const safeName = reportName.replace(/[^a-zA-Z0-9-_]/g, "_");
   const reportDirName = `${timestamp}-${safeName}`;
   const reportDir = path.join(sessionReportsDir, reportDirName);
@@ -109,7 +112,8 @@ export async function generateReportCommand(
   saveCheckpoint(sessionReportsDir, {
     sessionId,
     lastTimestamp,
-    lastReportAt: new Date().toISOString()
+    lastReportAt: nowIso,
+    lastReport: reportDirName
   });
 
   return { jsonPath, mdPath };
