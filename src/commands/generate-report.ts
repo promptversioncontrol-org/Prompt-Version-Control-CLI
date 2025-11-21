@@ -16,10 +16,15 @@ import { getReportsDir, ensureDirectoryExists, getPVCDir } from "../utils/path-u
 import { loadCheckpoint, saveCheckpoint, getLastTimestamp } from "../utils/checkpoint";
 import type { SessionReport, GenerateReportResult } from "../types";
 
+interface GenerateOptions {
+  lastCount?: number;
+}
+
 export async function generateReportCommand(
   sessionId: string,
   reportName: string,
-  cwd: string
+  cwd: string,
+  options?: GenerateOptions
 ): Promise<GenerateReportResult> {
   // Ensure PVC is initialized
   const pvcDir = getPVCDir(cwd);
@@ -64,12 +69,19 @@ export async function generateReportCommand(
   }
 
   // Extract data from filtered events
-  const userPrompts = extractUserPrompts(events);
-  const assistantMessages = extractAssistantMessages(events);
+  let userPrompts = extractUserPrompts(events);
+  let assistantMessages = extractAssistantMessages(events);
   const reasonings = extractReasonings(events);
   const shellCommands = extractShellCommands(events);
   const patches = extractPatches(events);
   const fileEdits = extractFileEdits(events);
+
+  // Optionally limit to last N user/assistant messages
+  if (options?.lastCount && options.lastCount > 0) {
+    const n = options.lastCount;
+    userPrompts = userPrompts.slice(-n);
+    assistantMessages = assistantMessages.slice(-n);
+  }
 
   // Use a single timestamp for this report
   const nowIso = new Date().toISOString();

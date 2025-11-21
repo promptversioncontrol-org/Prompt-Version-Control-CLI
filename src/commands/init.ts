@@ -16,7 +16,9 @@ export function initCommand(cwd: string): void {
   if (!existsSync(configPath)) {
     const config: PVCConfig = {
       remote: { url: "" },
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      lastSessionId: "",
+      userid:""
     };
     writeFileSync(configPath, JSON.stringify(config, null, 2));
   }
@@ -29,4 +31,3 @@ export function initCommand(cwd: string): void {
   console.log("✔ PVC initialized");
   console.log(`Created: ${pvcDir}`);
 }
-

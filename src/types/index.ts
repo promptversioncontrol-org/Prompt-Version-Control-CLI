@@ -3,6 +3,8 @@ export interface PVCConfig {
     url: string;
   };
   createdAt: string;
+  lastSessionId: string;
+  userid:string
 }
 
 export interface FileEdit {

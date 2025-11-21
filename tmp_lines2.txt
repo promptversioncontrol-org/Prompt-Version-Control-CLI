@@ -1,0 +1,90 @@
+ 231:     const mdContent = readFileSync(mdPath);
+ 232: 
+ 233:     const form = new (globalThis as any).FormData();
+ 234:     form.append("sessionId", sessionId);
+ 235:     form.append("cwd", cwd);
+ 236:     form.append("timestamp", new Date().toISOString());
+ 237:     form.append(
+ 238:       "reportJson",
+ 239:       new (globalThis as any).Blob([jsonContent], { type: "application/json" }),
+ 240:       path.basename(jsonPath)
+ 241:     );
+ 242:     form.append(
+ 243:       "reportMd",
+ 244:       new (globalThis as any).Blob([mdContent], { type: "text/markdown" }),
+ 245:       path.basename(mdPath)
+ 246:     );
+ 247: 
+ 248:     const response = await fetch("http://localhost:5000/upload", {
+ 249:       method: "POST",
+ 250:       body: form
+ 251:     });
+ 252: 
+ 253:     if (response.ok) {
+ 254:       console.log("✅ Report uploaded to backend");
+ 255:     } else {
+ 256:       console.error(`❌ Backend error ${response.status}: ${await response.text()}`);
+ 257:     }
+ 258:   } catch (error) {
+ 259:     console.error("❌ Failed to send to backend:", error);
+ 260:   }
+ 261: }
+ 262: 
+ 263: async function runWatchLoop(cwd: string, sessionId: string, intervalMs: number = 3000) {
+ 264:   const watchDir = getWatchDir(cwd, sessionId);
+ 265:   const watchDirName = path.basename(watchDir);
+ 266: 
+ 267:   console.log(`👁️  Watching session: ${sessionId}`);
+ 268:   console.log(`📁 Watch folder: ${watchDirName}`);
+ 269:   console.log(`⏱️  Checking every ${intervalMs}ms`);
+ 270:   console.log(`🛑 Stop with: pvc watch stop\n`);
+ 271: 
+ 272:   let lastMtime = 0;
+ 273:   let notFoundCount = 0;
+ 274: 
+ 275:   while (true) {
+ 276:     try {
+ 277:       const sessionFile = findCodexSessionFile(sessionId);
+ 278: 
+ 279:       if (!sessionFile) {
+ 280:         notFoundCount++;
+ 281:         if (notFoundCount === 1) {
+ 282:           console.log("⏳ Waiting for session file to appear...");
+ 283:         }
+ 284:         await new Promise(r => setTimeout(r, intervalMs));
+ 285:         continue;
+ 286:       }
+ 287: 
+ 288:       if (notFoundCount > 0) {
+ 289:         console.log(`✅ Session file found: ${sessionFile}\n`);
+ 290:         notFoundCount = 0;
+ 291:       }
+ 292: 
+ 293:       const stat = statSync(sessionFile);
+ 294: 
+ 295:       if (stat.mtimeMs > lastMtime) {
+ 296:         lastMtime = stat.mtimeMs;
+ 297:         console.log(`\n🔔 New activity detected at ${new Date().toLocaleTimeString()}`);
+ 298:         await updateReports(cwd, sessionId, sessionFile);
+ 299:         console.log("");
+ 300:       }
+ 301:     } catch (err) {
+ 302:       console.error(`❌ Error: ${(err as Error).message}`);
+ 303:     }
+ 304: 
+ 305:     await new Promise(r => setTimeout(r, intervalMs));
+ 306:   }
+ 307: }
+ 308: 
+ 309: function startDaemon(cwd: string, sessionId: string) {
+ 310:   const isBun = process.execPath.toLowerCase().includes("bun");
+ 311:   const entry = process.argv[1];
+ 312:   const args = isBun
+ 313:     ? [entry, "watch", "--daemon", `--session=${sessionId}`]
+ 314:     : ["watch", "--daemon", `--session=${sessionId}`];
+ 315: 
+ 316:   const child = spawn(process.execPath, args, {
+ 317:     cwd,
+ 318:     detached: true,
+ 319:     stdio: "ignore",
+ 320:     windowsHide: true
