@@ -8,6 +8,12 @@ import type {
   FileEdit,
 } from '../types';
 
+// ========================================
+// FINALNA WERSJA - parseAugmentedPrompt
+// Z OBSŁUGĄ @MENTIONS (nowy format Codex)
+// Wklej to do: src/utils/jsonl-parser.ts
+// ========================================
+
 interface ParsedPrompt {
   text: string;
   context?: string;
@@ -17,9 +23,18 @@ interface ParsedPrompt {
 }
 
 function parseAugmentedPrompt(raw: string): ParsedPrompt {
-  // Detect Codex IDE context blocks and split into fields
+  console.log('\n      🔍 parseAugmentedPrompt START');
+  console.log(`         Input length: ${raw.length}`);
+  console.log(
+    `         Has IDE context: ${raw.includes('# Context from my IDE setup')}`,
+  );
+  console.log(`         Has markdown links: ${/\[.*?\]\(.*?\)/.test(raw)}`);
+  console.log(`         Has @mentions: ${/@[\w.-]+\.\w+/.test(raw)}`);
+
+  // Jeśli nie ma IDE context, zwróć raw text
   if (!raw.includes('# Context from my IDE setup')) {
     const clean = raw.trim();
+    console.log(`         ✅ No IDE context, returning raw text`);
     return { text: clean };
   }
 
@@ -32,26 +47,36 @@ function parseAugmentedPrompt(raw: string): ParsedPrompt {
   };
 
   const lines = raw.split(/\r?\n/);
+  console.log(`         Total lines: ${lines.length}`);
 
   for (const line of lines) {
+    // Wykryj nagłówek główny
     if (/^#\s+Context from my IDE setup:?/i.test(line)) {
       current = 'context';
       continue;
     }
 
+    // Wykryj sekcje (## Active file, ## My request, etc.)
     const headerMatch = line.match(
       /^##\s+(Active file|Active selection of the file|Open tabs|My request for Codex):\s*(.*)$/i,
     );
+
     if (headerMatch) {
       const sectionName = headerMatch[1].toLowerCase();
       const inlineValue = headerMatch[2];
 
-      if (sectionName.startsWith('active file')) current = 'activeFile';
-      else if (sectionName.startsWith('active selection'))
+      if (sectionName.startsWith('active file')) {
+        current = 'activeFile';
+      } else if (sectionName.startsWith('active selection')) {
         current = 'activeSelection';
-      else if (sectionName.startsWith('open tabs')) current = 'openTabs';
-      else if (sectionName.startsWith('my request')) current = 'request';
-      else current = 'context';
+      } else if (sectionName.startsWith('open tabs')) {
+        current = 'openTabs';
+      } else if (sectionName.startsWith('my request')) {
+        current = 'request';
+        console.log(`         📌 Found "My request for Codex" section`);
+      } else {
+        current = 'context';
+      }
 
       if (inlineValue) {
         pushLine(current, inlineValue);
@@ -68,15 +93,70 @@ function parseAugmentedPrompt(raw: string): ParsedPrompt {
     .map((line) => line.replace(/^\s*-\s*/, '').trim())
     .filter(Boolean);
 
+  // ✅ Weź tekst z sekcji "request"
+  let requestText =
+    getSection('request') || getSection('context') || raw.trim();
+
+  console.log(`         ✅ Request section extracted`);
+  console.log(`         ✅ Request length: ${requestText.length}`);
+  console.log(
+    `         ✅ Request preview: ${requestText.substring(0, 100)}...`,
+  );
+  console.log(
+    `         ✅ Has markdown links: ${/\[.*?\]\(.*?\)/.test(requestText)}`,
+  );
+  console.log(
+    `         ✅ Has @mentions: ${/@[\w.-]+\.\w+/.test(requestText)}`,
+  );
+
+  // ✅ NOWE: Zamień @mentions na markdown linki
+  // @asdadad.pfx → [asdadad.pfx](asdadad.pfx)
+  const originalText = requestText;
+  requestText = requestText.replace(/@([\w.-]+\.\w+)/g, '[$1]($1)');
+
+  if (originalText !== requestText) {
+    console.log(`         🔄 Converted @mentions to markdown links`);
+    console.log(`         ✅ New text: ${requestText.substring(0, 100)}...`);
+    console.log(
+      `         ✅ Now has markdown links: ${/\[.*?\]\(.*?\)/.test(requestText)}`,
+    );
+  }
+
   const result: ParsedPrompt = {
-    text: getSection('request') || getSection('context') || raw.trim(),
+    text: requestText, // ← ZAWIERA [asdadad.pfx](asdadad.pfx)
     context: getSection('context') || undefined,
     activeFile: getSection('activeFile') || undefined,
     activeSelection: getSection('activeSelection') || undefined,
     openTabs: openTabs.length ? openTabs : undefined,
   };
 
+  console.log(`         ✅ parseAugmentedPrompt END\n`);
   return result;
+}
+
+// ✅ DODAJ debugging do extractUserPrompts
+export function extractUserPrompts(events: any[]): UserPrompt[] {
+  return events
+    .filter((e) => e.type === 'event_msg' && e.payload?.type === 'user_message')
+    .map((e) => {
+      const parsed = parseAugmentedPrompt(e.payload.message || '');
+
+      // ✅ DEBUG: Sprawdź czy linki są zachowane
+      if (process.env.PVC_DEBUG === 'true') {
+        console.log('📝 Raw message:', e.payload.message?.substring(0, 200));
+        console.log('📝 Parsed text:', parsed.text.substring(0, 200));
+        console.log('📝 Contains links:', /\[.*?\]\(.*?\)/.test(parsed.text));
+      }
+
+      return {
+        timestamp: e.timestamp,
+        text: parsed.text,
+        context: parsed.context,
+        activeFile: parsed.activeFile,
+        activeSelection: parsed.activeSelection,
+        openTabs: parsed.openTabs,
+      };
+    });
 }
 
 export function parseJSONLFile(filepath: string): any[] {
@@ -95,22 +175,6 @@ export function parseJSONLFile(filepath: string): any[] {
   }
 
   return events;
-}
-
-export function extractUserPrompts(events: any[]): UserPrompt[] {
-  return events
-    .filter((e) => e.type === 'event_msg' && e.payload?.type === 'user_message')
-    .map((e) => {
-      const parsed = parseAugmentedPrompt(e.payload.message || '');
-      return {
-        timestamp: e.timestamp,
-        text: parsed.text,
-        context: parsed.context,
-        activeFile: parsed.activeFile,
-        activeSelection: parsed.activeSelection,
-        openTabs: parsed.openTabs,
-      };
-    });
 }
 
 export function extractAssistantMessages(events: any[]): AssistantMessage[] {

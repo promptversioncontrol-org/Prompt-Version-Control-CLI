@@ -1,7 +1,7 @@
-import type { SessionReport, FileEdit } from "../types";
+import type { SessionReport, FileEdit } from '../types';
 
 interface DiffLine {
-  type: "unchanged" | "removed" | "added";
+  type: 'unchanged' | 'removed' | 'added';
   oldLineNumber?: number;
   newLineNumber?: number;
   content: string;
@@ -61,7 +61,7 @@ function backtrack(
   trace: Map<number, number>[],
   oldLines: string[],
   newLines: string[],
-  d: number
+  d: number,
 ): DiffLine[] {
   const result: DiffLine[] = [];
   let x = oldLines.length;
@@ -72,7 +72,10 @@ function backtrack(
     const k = x - y;
     let prevK: number;
 
-    if (k === -depth || (k !== depth && (v.get(k - 1) || 0) < (v.get(k + 1) || 0))) {
+    if (
+      k === -depth ||
+      (k !== depth && (v.get(k - 1) || 0) < (v.get(k + 1) || 0))
+    ) {
       prevK = k + 1;
     } else {
       prevK = k - 1;
@@ -85,26 +88,26 @@ function backtrack(
       x--;
       y--;
       result.unshift({
-        type: "unchanged",
+        type: 'unchanged',
         oldLineNumber: x + 1,
         newLineNumber: y + 1,
-        content: oldLines[x]
+        content: oldLines[x],
       });
     }
 
     if (x > prevX) {
       x--;
       result.unshift({
-        type: "removed",
+        type: 'removed',
         oldLineNumber: x + 1,
-        content: oldLines[x]
+        content: oldLines[x],
       });
     } else if (y > prevY) {
       y--;
       result.unshift({
-        type: "added",
+        type: 'added',
         newLineNumber: y + 1,
-        content: newLines[y]
+        content: newLines[y],
       });
     }
   }
@@ -113,10 +116,10 @@ function backtrack(
     x--;
     y--;
     result.unshift({
-      type: "unchanged",
+      type: 'unchanged',
       oldLineNumber: x + 1,
       newLineNumber: y + 1,
-      content: oldLines[x]
+      content: oldLines[x],
     });
   }
 
@@ -131,34 +134,34 @@ function simpleDiff(oldLines: string[], newLines: string[]): DiffLine[] {
     if (i < oldLines.length && i < newLines.length) {
       if (oldLines[i] === newLines[i]) {
         result.push({
-          type: "unchanged",
+          type: 'unchanged',
           oldLineNumber: i + 1,
           newLineNumber: i + 1,
-          content: oldLines[i]
+          content: oldLines[i],
         });
       } else {
         result.push({
-          type: "removed",
+          type: 'removed',
           oldLineNumber: i + 1,
-          content: oldLines[i]
+          content: oldLines[i],
         });
         result.push({
-          type: "added",
+          type: 'added',
           newLineNumber: i + 1,
-          content: newLines[i]
+          content: newLines[i],
         });
       }
     } else if (i < oldLines.length) {
       result.push({
-        type: "removed",
+        type: 'removed',
         oldLineNumber: i + 1,
-        content: oldLines[i]
+        content: oldLines[i],
       });
     } else {
       result.push({
-        type: "added",
+        type: 'added',
         newLineNumber: i + 1,
-        content: newLines[i]
+        content: newLines[i],
       });
     }
   }
@@ -166,13 +169,16 @@ function simpleDiff(oldLines: string[], newLines: string[]): DiffLine[] {
   return result;
 }
 
-function createHunks(diffLines: DiffLine[], contextLines: number = 3): DiffHunk[] {
+function createHunks(
+  diffLines: DiffLine[],
+  contextLines: number = 3,
+): DiffHunk[] {
   const hunks: DiffHunk[] = [];
   let currentHunk: DiffHunk | null = null;
   let unchangedBuffer: DiffLine[] = [];
 
   for (const line of diffLines) {
-    if (line.type === "unchanged") {
+    if (line.type === 'unchanged') {
       unchangedBuffer.push(line);
       if (currentHunk && unchangedBuffer.length > contextLines * 2) {
         currentHunk.lines.push(...unchangedBuffer.slice(0, contextLines));
@@ -189,7 +195,7 @@ function createHunks(diffLines: DiffLine[], contextLines: number = 3): DiffHunk[
           oldCount: 0,
           newStart: firstLine.newLineNumber || 0,
           newCount: 0,
-          lines: [...leadingContext]
+          lines: [...leadingContext],
         };
         unchangedBuffer = [];
       } else {
@@ -205,9 +211,9 @@ function createHunks(diffLines: DiffLine[], contextLines: number = 3): DiffHunk[
     hunks.push(currentHunk);
   }
 
-  hunks.forEach(hunk => {
-    hunk.oldCount = hunk.lines.filter(l => l.type !== "added").length;
-    hunk.newCount = hunk.lines.filter(l => l.type !== "removed").length;
+  hunks.forEach((hunk) => {
+    hunk.oldCount = hunk.lines.filter((l) => l.type !== 'added').length;
+    hunk.newCount = hunk.lines.filter((l) => l.type !== 'removed').length;
   });
 
   return hunks;
@@ -221,33 +227,38 @@ function cleanMessageText(raw: string): string {
   let text = raw;
 
   // If Codex-style wrapper is present, keep only the actual request
-  const marker = "## My request for Codex:";
+  const marker = '## My request for Codex:';
   const markerIndex = text.indexOf(marker);
   if (markerIndex !== -1) {
     text = text.slice(markerIndex + marker.length).trim();
   }
 
   // Remove leading "# Context from my IDE setup" block if any remains
-  text = text.replace(/# Context from my IDE setup:[\s\S]*?(?:## My request for Codex:)?/m, "").trim();
+  text = text
+    .replace(
+      /# Context from my IDE setup:[\s\S]*?(?:## My request for Codex:)?/m,
+      '',
+    )
+    .trim();
 
   return text;
 }
 
 function escapeHtml(text: string): string {
-  if (!text) return "";
+  if (!text) return '';
   return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;")
-    .replace(/ /g, "&nbsp;")
-    .replace(/\t/g, "&nbsp;&nbsp;&nbsp;&nbsp;");
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/ /g, '&nbsp;')
+    .replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;');
 }
 
 function createCompactDiff(oldContent: string, newContent: string): string {
-  const oldLines = oldContent.split("\n");
-  const newLines = newContent.split("\n");
+  const oldLines = oldContent.split('\n');
+  const newLines = newContent.split('\n');
   const diffLines = computeDiff(oldLines, newLines);
   const hunks = createHunks(diffLines, 3);
 
@@ -270,12 +281,12 @@ function createCompactDiff(oldContent: string, newContent: string): string {
       const lineNumSpan =
         `<span style="color:#666;user-select:none;display:inline-block;width:40px;text-align:right;margin-right:12px">` +
         lineNum +
-        "</span>";
-      const content = escapeHtml(line.content) || "&nbsp;";
+        '</span>';
+      const content = escapeHtml(line.content) || '&nbsp;';
 
-      if (line.type === "removed") {
+      if (line.type === 'removed') {
         html += `<div style="background:#4a1a1a;color:#ff6b6b">${lineNumSpan}<span style="color:#ff4444">-</span> <s>${content}</s></div>\\n`;
-      } else if (line.type === "added") {
+      } else if (line.type === 'added') {
         html += `<div style="background:#1a4a1a;color:#69db7c">${lineNumSpan}<span style="color:#44ff44">+</span> ${content}</div>\\n`;
       } else {
         html += `<div style="color:#d4d4d4">${lineNumSpan}<span style="color:#666">&nbsp;</span> ${content}</div>\\n`;
@@ -283,7 +294,7 @@ function createCompactDiff(oldContent: string, newContent: string): string {
     }
   }
 
-  html += "</div>";
+  html += '</div>';
   return html;
 }
 
@@ -300,35 +311,119 @@ export function generateMarkdownReport(report: SessionReport): string {
   md += `- **File Edits:** ${report.fileEdits.length}\n\n`;
   md += `---\n\n`;
 
+  // --- RISK SUMMARY ---
+  if (report.riskSummary && report.riskSummary.totalFindings > 0) {
+    const { maxScore, totalFindings, findings } = report.riskSummary;
+
+    // Count by severity
+    const counts = { high: 0, medium: 0, low: 0 };
+    findings.forEach((f) => {
+      if (counts[f.severity] !== undefined) counts[f.severity]++;
+    });
+
+    md += `## Risk Summary\n\n`;
+    md += `- **Max risk score (0–100):** ${maxScore}\n`;
+    md += `- **Total findings:** ${totalFindings}\n\n`;
+    md += `| Severity | Count |\n`;
+    md += `|---|---|\n`;
+    md += `| 🔴 High | ${counts.high} |\n`;
+    md += `| 🟠 Medium | ${counts.medium} |\n`;
+    md += `| 🟡 Low | ${counts.low} |\n\n`;
+    md += `### Top Findings\n\n`;
+
+    // Sort by severity (High > Medium > Low) then timestamp
+    const severityOrder = { high: 3, medium: 2, low: 1 };
+    const sortedFindings = [...findings].sort((a, b) => {
+      const diff = severityOrder[b.severity] - severityOrder[a.severity];
+      if (diff !== 0) return diff;
+      return (b.timestamp || '').localeCompare(a.timestamp || '');
+    });
+
+    // Show top 10
+    sortedFindings.slice(0, 10).forEach((f, i) => {
+      const icon =
+        f.severity === 'high' ? '🔴' : f.severity === 'medium' ? '🟠' : '🟡';
+      const source = f.source === 'file' ? `file \`${f.filePath}\`` : f.source;
+      let snippet = f.snippet
+        ? ` – "${f.snippet.replace(/\n/g, ' ').substring(0, 50)}..."`
+        : '';
+      if (f.blocked) snippet += ' (BLOCKED)';
+
+      md += `${i + 1}. ${icon} **[${f.severity}]** ${f.ruleId} in ${source}${snippet}\n`;
+    });
+
+    if (sortedFindings.length > 10) {
+      md += `\n`;
+      md += `... and ${sortedFindings.length - 10} more.\n`;
+    }
+
+    md += `\n`;
+    md += `---\n\n`;
+  } else if (
+    typeof report.riskScore === 'number' &&
+    report.findings &&
+    report.findings.length > 0
+  ) {
+    // Legacy fallback
+    const total = report.findings.length;
+    const high = report.findings.filter((f) => f.severity === 'high').length;
+    const medium = report.findings.filter(
+      (f) => f.severity === 'medium',
+    ).length;
+    const low = report.findings.filter((f) => f.severity === 'low').length;
+
+    md += `## Risk Summary (Legacy)\n\n`;
+    md += `- **Risk Score:** ${report.riskScore} / 100\n`;
+    md += `- **Findings:** ${total} (high: ${high}, medium: ${medium}, low: ${low})\n\n`;
+
+    md += `### Findings Details\n\n`;
+    for (const f of report.findings) {
+      const blockedTag = f.blocked ? ' (BLOCKED PROMPT)' : '';
+      md += `- **[${f.severity.toUpperCase()}] ${f.ruleId}${blockedTag}** – ${f.message}\n`;
+      md += `  - Source: \`${f.sourceType}\` (${f.sourceId}) at ${f.timestamp}\n`;
+      if (f.snippet) {
+        const snippet = f.snippet.replace(/\n/g, ' ');
+        md += `  - Snippet: \`${snippet.slice(0, 120)}\`\n`;
+      }
+      md += `\n`;
+    }
+
+    md += `---\n\n`;
+  }
+
   // Timeline
   md += `## Session Timeline\n\n`;
 
-  const userPrompts = report.userPrompts.map(p => ({
+  const userPrompts = report.userPrompts.map((p) => ({
     timestamp: p.timestamp,
-    type: "user" as const,
-    data: p
+    type: 'user' as const,
+    data: p,
   }));
 
-  const assistantMessages = report.assistantMessages.map(a => ({
+  const assistantMessages = report.assistantMessages.map((a) => ({
     timestamp: a.timestamp,
-    type: "assistant" as const,
-    data: a
+    type: 'assistant' as const,
+    data: a,
   }));
 
-  const fileEditsTimeline = report.fileEdits.map(e => ({
+  const fileEditsTimeline = report.fileEdits.map((e) => ({
     timestamp: e.timestamp,
-    type: "file_edit" as const,
-    data: e
+    type: 'file_edit' as const,
+    data: e,
   }));
 
-  const allEvents = [...userPrompts, ...assistantMessages, ...fileEditsTimeline].sort(
-    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  const allEvents = [
+    ...userPrompts,
+    ...assistantMessages,
+    ...fileEditsTimeline,
+  ].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
   );
 
   // Group consecutive file edits for same file
   const groupedTimeline: Array<{
     timestamp: string;
-    type: "user" | "assistant" | "file_edits";
+    type: 'user' | 'assistant' | 'file_edits';
     data: any;
   }> = [];
 
@@ -336,17 +431,18 @@ export function generateMarkdownReport(report: SessionReport): string {
   while (i < allEvents.length) {
     const current = allEvents[i];
 
-    if (current.type === "file_edit") {
-      const filePath = current.data.path;
-      const groupedEdits: FileEdit[] = [current.data];
+    if (current.type === 'file_edit') {
+      const editData = current.data as FileEdit;
+      const filePath = editData.path;
+      const groupedEdits: FileEdit[] = [editData];
       let j = i + 1;
 
       while (
         j < allEvents.length &&
-        allEvents[j].type === "file_edit" &&
-        allEvents[j].data.path === filePath
+        allEvents[j].type === 'file_edit' &&
+        (allEvents[j].data as FileEdit).path === filePath
       ) {
-        groupedEdits.push(allEvents[j].data);
+        groupedEdits.push(allEvents[j].data as FileEdit);
         j++;
       }
 
@@ -355,15 +451,16 @@ export function generateMarkdownReport(report: SessionReport): string {
 
       groupedTimeline.push({
         timestamp: firstEdit.timestamp,
-        type: "file_edits",
+        type: 'file_edits',
         data: {
           path: filePath,
           oldContent: firstEdit.oldContent,
           newContent: lastEdit.newContent,
-          isNewFile: (firstEdit as FileEdit & { isNewFile?: boolean }).isNewFile,
+          isNewFile: (firstEdit as FileEdit & { isNewFile?: boolean })
+            .isNewFile,
           editCount: groupedEdits.length,
-          timestamps: groupedEdits.map(e => e.timestamp)
-        }
+          timestamps: groupedEdits.map((e) => e.timestamp),
+        },
       });
 
       i = j;
@@ -375,17 +472,17 @@ export function generateMarkdownReport(report: SessionReport): string {
 
   // Generate timeline entries
   for (const item of groupedTimeline) {
-    if (item.type === "user") {
+    if (item.type === 'user') {
       md += `### User - \`${item.timestamp}\`\n\n`;
       md += cleanMessageText(item.data.text);
-      md += "\n\n";
+      md += '\n\n';
       md += `---\n\n`;
-    } else if (item.type === "assistant") {
+    } else if (item.type === 'assistant') {
       md += `### Assistant - \`${item.timestamp}\`\n\n`;
       md += cleanMessageText(item.data.text);
-      md += "\n\n";
+      md += '\n\n';
       md += `---\n\n`;
-    } else if (item.type === "file_edits") {
+    } else if (item.type === 'file_edits') {
       const edit = item.data as {
         path: string;
         oldContent: string;
@@ -401,18 +498,20 @@ export function generateMarkdownReport(report: SessionReport): string {
           md += `*${edit.editCount} consecutive edits merged*\n\n`;
         }
 
-        const lines = edit.newContent.split("\n");
+        const lines = edit.newContent.split('\n');
         md += `<details>\n<summary>View Content (${lines.length} lines)</summary>\n\n`;
-        md += "```tsx\n";
+        md += '```tsx\n';
         md += edit.newContent;
-        md += "\n```\n\n";
+        md += '\n```\n\n';
         md += `</details>\n\n`;
       } else {
-        const oldLines = edit.oldContent.split("\n");
-        const newLines = edit.newContent.split("\n");
+        const oldLines = edit.oldContent.split('\n');
+        const newLines = edit.newContent.split('\n');
         const diffLines = computeDiff(oldLines, newLines);
-        const addedCount = diffLines.filter(l => l.type === "added").length;
-        const removedCount = diffLines.filter(l => l.type === "removed").length;
+        const addedCount = diffLines.filter((l) => l.type === 'added').length;
+        const removedCount = diffLines.filter(
+          (l) => l.type === 'removed',
+        ).length;
 
         md += `### Modified File: \`${edit.path}\`\n\n`;
         if (edit.editCount > 1) {

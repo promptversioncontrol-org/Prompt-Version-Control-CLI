@@ -315,6 +315,31 @@ async function main() {
         await pushCommand(cwd);
         break;
 
+      case 'risk': {
+        const sub = args[1];
+        const { analyzePromptRealtime, scanFileForSensitiveData } =
+          await import('./utils/risk-analyzer');
+
+        if (sub === 'scan-prompt') {
+          const text = args.slice(2).join(' ');
+          const res = analyzePromptRealtime(text, cwd);
+          console.log(JSON.stringify(res, null, 2));
+        } else if (sub === 'scan-file') {
+          const file = args[2];
+          if (!file) {
+            console.error('Usage: pvc risk scan-file <path>');
+            process.exit(1);
+          }
+          const res = scanFileForSensitiveData(path.resolve(cwd, file), cwd);
+          console.log(JSON.stringify(res, null, 2));
+        } else {
+          console.log('Usage:');
+          console.log('  pvc risk scan-prompt "text..."');
+          console.log('  pvc risk scan-file path/to/file');
+        }
+        break;
+      }
+
       default:
         showHelp();
     }

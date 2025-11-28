@@ -29,9 +29,9 @@ export const getEnvironment = (name: string, required = true) => {
 };
 
 export const ENV = {
-  AWS_ACCESS_KEY_ID: getEnvironment('AWS_ACCESS_KEY_ID', true),
-  AWS_SECRET_ACCESS_KEY: getEnvironment('AWS_SECRET_ACCESS_KEY', true),
-  AWS_REGION: getEnvironment('AWS_REGION', false) || 'eu-north-1', // Made optional
-  AWS_BUCKET_NAME: getEnvironment('AWS_BUCKET_NAME', true),
-  AWS_KMS_KEY_ID: getEnvironment('AWS_KMS_KEY_ID', false), // Consider making optional
+  AWS_ACCESS_KEY_ID: getEnvironment('AWS_ACCESS_KEY_ID', false),
+  AWS_SECRET_ACCESS_KEY: getEnvironment('AWS_SECRET_ACCESS_KEY', false),
+  AWS_REGION: getEnvironment('AWS_REGION', false) || 'eu-north-1',
+  AWS_BUCKET_NAME: getEnvironment('AWS_BUCKET_NAME', false),
+  AWS_KMS_KEY_ID: getEnvironment('AWS_KMS_KEY_ID', false),
 };

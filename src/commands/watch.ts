@@ -28,6 +28,11 @@ import {
   getLastTimestamp,
 } from '../utils/checkpoint';
 import type { SessionReport } from '../types';
+import { loadRiskRules, analyzeRisks } from '../utils/risk-analyzer';
+import {
+  loadBlockedPromptsForSession,
+  getBlockedLogPath,
+} from '../utils/blocked-prompts';
 
 interface PVCConfigFile {
   remote?: { url?: string };
@@ -111,6 +116,8 @@ async function updateReports(
   sessionId: string,
   sessionFile: string,
 ) {
+  console.log('\n🔥 ========== UPDATE REPORTS START ========== 🔥');
+
   const reportsRootDir = getReportsDir(cwd);
   const sessionReportsDir = path.join(reportsRootDir, sessionId);
 
@@ -123,6 +130,7 @@ async function updateReports(
 
   // Load checkpoint and filter to only NEW events
   const checkpoint = loadCheckpoint(sessionReportsDir);
+
   let events = allEvents;
 
   if (checkpoint?.lastTimestamp) {
@@ -141,13 +149,96 @@ async function updateReports(
       `📊 Found ${events.length} new events (${allEvents.length} total)`,
     );
   } else {
-    console.log(`📊 Processing ${events.length} events (first watch run)`);
+    if (events.length > 0) {
+      console.log(`📊 Processing ${events.length} events (first watch run)`);
+    }
   }
 
   // Extract data ONLY from new events
   const userPrompts = extractUserPrompts(events);
   const assistantMessages = extractAssistantMessages(events);
   const fileEdits = extractFileEdits(events);
+
+  // Check for blocked prompts
+  const blockedEvents = loadBlockedPromptsForSession(cwd, sessionId);
+  console.log(`🚫 Blocked events loaded: ${blockedEvents.length}`);
+
+  let newBlockedCount = 0;
+  if (checkpoint?.lastTimestamp) {
+    const last = new Date(checkpoint.lastTimestamp).getTime();
+    for (const ev of blockedEvents) {
+      if (new Date(ev.timestamp).getTime() > last) {
+        console.log(`\n🚫 BLOCKED PROMPT: ${ev.prompt.slice(0, 60)}...`);
+        newBlockedCount++;
+      }
+    }
+  }
+
+  if (events.length === 0 && newBlockedCount === 0) {
+    console.log('ℹ️  No new events or blocked prompts since last checkpoint');
+    return;
+  }
+
+  // ========================================
+  // 🔥 RISK ANALYSIS - TUTAJ WYWOŁUJEMY!
+  // ========================================
+  // ========================================
+  // 🔥 RISK ANALYSIS
+  // ========================================
+  const allFindings: any[] = [];
+  let maxScore = 0;
+
+  const { analyzePromptRealtime, scanFileForSensitiveData } =
+    await import('../utils/risk-analyzer');
+
+  for (const p of userPrompts) {
+    const res = analyzePromptRealtime(p.text || '', cwd);
+
+    allFindings.push(...res.findings);
+    maxScore = Math.max(maxScore, res.riskScore);
+
+    if (res.findings.length > 0) {
+      console.log(`\n⚠️  Risk detected in prompt:`);
+      res.findings.forEach((f) => {
+        const icon =
+          f.severity === 'high' ? '🔴' : f.severity === 'medium' ? '🟠' : '🟡';
+        console.log(`   ${icon} [${f.severity}] ${f.ruleId}: ${f.message}`);
+      });
+    }
+  }
+
+  for (const edit of fileEdits) {
+    const res = scanFileForSensitiveData(edit.path, cwd);
+    allFindings.push(...res.findings);
+    maxScore = Math.max(maxScore, res.riskScore);
+
+    if (res.findings.length > 0) {
+      console.log(`\n⚠️  Risk detected in file: ${edit.path}`);
+      res.findings.forEach((f) => {
+        const icon =
+          f.severity === 'high' ? '🔴' : f.severity === 'medium' ? '🟠' : '🟡';
+        console.log(`   ${icon} [${f.severity}] ${f.ruleId}: ${f.message}`);
+      });
+    }
+  }
+
+  // Blocked findings
+  const blockedFindings = blockedEvents.flatMap((ev) =>
+    ev.findings.map((f) => ({
+      ...f,
+      blocked: true,
+      message:
+        f.message ||
+        `User attempted to send a sensitive prompt (blocked) in session ${sessionId}.`,
+    })),
+  );
+
+  const mergedFindings = [...allFindings, ...blockedFindings];
+  const mergedScore = Math.max(
+    maxScore,
+    ...blockedEvents.map((ev) => ev.riskScore),
+    0,
+  );
 
   const nowIso = new Date().toISOString();
 
@@ -163,9 +254,38 @@ async function updateReports(
     patches: [],
     shellCommands: [],
     fileEdits,
+    riskScore: mergedScore, // Legacy
+    findings: mergedFindings, // Legacy
+    riskSummary: {
+      maxScore: mergedScore,
+      totalFindings: mergedFindings.length,
+      findings: mergedFindings,
+    },
   };
 
   const { jsonPath, mdPath } = getReportFilePaths(cwd, sessionId);
+  const findingsPath = path.join(path.dirname(jsonPath), 'findings.json');
+
+  // Update cumulative findings.json
+  if (mergedFindings.length > 0) {
+    let existingFindings: any[] = [];
+    if (existsSync(findingsPath)) {
+      try {
+        existingFindings = JSON.parse(readFileSync(findingsPath, 'utf-8'));
+      } catch {
+        existingFindings = [];
+      }
+    }
+
+    // Append new findings
+    const updatedFindings = [...existingFindings, ...mergedFindings];
+    writeFileSync(
+      findingsPath,
+      JSON.stringify(updatedFindings, null, 2),
+      'utf-8',
+    );
+    console.log(`   🚨 Findings updated: ${findingsPath}`);
+  }
 
   // Generate new content for this update
   const newMdContent = generateMarkdownReport(report);
@@ -320,6 +440,7 @@ async function runWatchLoop(
   console.log(`🛑 Stop with: pvc watch stop\n`);
 
   let lastMtime = 0;
+  let lastBlockedMtime = 0;
   let notFoundCount = 0;
 
   while (true) {
@@ -347,6 +468,28 @@ async function runWatchLoop(
         console.log(
           `\n🔔 New activity detected at ${new Date().toLocaleTimeString()}`,
         );
+        await updateReports(cwd, sessionId, sessionFile);
+        console.log('');
+      }
+
+      const blockedPath = getBlockedLogPath(cwd);
+      let blockedChanged = false;
+      if (existsSync(blockedPath)) {
+        const bStat = statSync(blockedPath);
+        if (bStat.mtimeMs > lastBlockedMtime) {
+          lastBlockedMtime = bStat.mtimeMs;
+          blockedChanged = true;
+        }
+      }
+
+      if (stat.mtimeMs > lastMtime || blockedChanged) {
+        lastMtime = stat.mtimeMs;
+        console.log(
+          `\n🔔 New activity detected at ${new Date().toLocaleTimeString()}`,
+        );
+        if (blockedChanged) {
+          console.log('🚫 (Blocked prompts log updated)');
+        }
         await updateReports(cwd, sessionId, sessionFile);
         console.log('');
       }
@@ -467,5 +610,11 @@ export async function watchCommand(cwd: string, args: string[]): Promise<void> {
     process.exit(1);
   }
 
-  startDaemon(cwd, sessionId);
+  if (args.includes('--detach')) {
+    startDaemon(cwd, sessionId);
+    return;
+  }
+
+  // Foreground mode
+  await runWatchLoop(cwd, sessionId);
 }

@@ -45,6 +45,55 @@ export interface Patch {
   patch: string;
 }
 
+export type RiskSeverity = 'low' | 'medium' | 'high';
+
+export interface RiskRule {
+  id: string;
+  description: string;
+  severity: RiskSeverity;
+  // where rule applies:
+  //  - 'content'  → regex against text
+  //  - 'filename' → regex/glob against file path
+  //  - 'folder'   → regex/glob against folder path
+  scope: 'content' | 'filename' | 'folder';
+  pattern?: string;
+  // Legacy support (optional)
+  flags?: string;
+  scopes?: string[];
+}
+
+export interface RiskFinding {
+  ruleId: string;
+  severity: RiskSeverity;
+  message: string;
+  snippet?: string;
+  filePath?: string;
+  line?: number;
+  source: 'prompt' | 'file' | 'assistant';
+  timestamp: string;
+  // Legacy support (optional)
+  sourceType?: string;
+  sourceId?: string;
+  blocked?: boolean;
+}
+
+export interface SensitiveScanResult {
+  hasSensitiveData: boolean;
+  riskScore: number; // 0 – 100
+  findings: RiskFinding[];
+}
+
+export interface RiskSummary {
+  maxScore: number;
+  totalFindings: number;
+  findings: RiskFinding[];
+}
+
+export interface AnalyzeResult {
+  score: number;
+  findings: RiskFinding[];
+}
+
 export interface SessionReport {
   sessionId: string;
   cwd: string;
@@ -56,6 +105,9 @@ export interface SessionReport {
   patches: Patch[];
   shellCommands: ShellCommand[];
   fileEdits: FileEdit[];
+  riskScore: number; // Keep for backward compatibility or update to use riskSummary
+  findings: RiskFinding[]; // Keep for backward compatibility
+  riskSummary?: RiskSummary;
 }
 
 export interface GenerateReportResult {
