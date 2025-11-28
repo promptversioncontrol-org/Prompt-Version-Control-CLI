@@ -1,34 +1,0 @@
-🔍 Testing Sensitive Data Detection Rules...
-
-✅ Line 1: Detected aws-access-token
-✅ Line 2: Detected aws-secret-key
-❌ Line 3: NO DETECTION. Content: "3. Potrzebujesz tokenu? Oto on: aws_session_token=..."
-❌ Line 4: NO DETECTION. Content: "4. Klucz do storage: AccountKey=8d7f9a6b5c4e3d2f1a..."
-❌ Line 5: NO DETECTION. Content: "5. API key do Google: AIzaSyD-ExampleKey1234567890..."
-✅ Line 6: Detected gcp-service-account
-✅ Line 7: Detected RSA-PK
-✅ Line 8: Detected OPENSSH-PK
-✅ Line 9: Detected PGP-PK
-✅ Line 10: Detected SSH-EC-PK
-✅ Line 11: Detected github-pat
-✅ Line 12: Detected github-oauth
-✅ Line 13: Detected slack-access-token
-✅ Line 14: Detected slack-web-hook
-✅ Line 15: Detected stripe-access-token
-❌ Line 16: NO DETECTION. Content: "16. SendGrid API: SG.1234567890abcdefghij.12345678..."
-❌ Line 17: NO DETECTION. Content: "17. Mailgun key: key-1234567890abcdef1234567890abc..."
-❌ Line 18: NO DETECTION. Content: "18. NPM token: npm_abcdefghijklmnopqrstuvwxyz12345..."
-❌ Line 19: NO DETECTION. Content: "19. Baza mongo: mongodb://user:password@localhost:..."
-❌ Line 20: NO DETECTION. Content: "20. Postgres connection: postgres://user:password@..."
-❌ Line 21: NO DETECTION. Content: "21. Redis: redis://:password@localhost:6379..."
-❌ Line 22: NO DETECTION. Content: "22. Hasło do bazy: password = "SuperSecretPassword..."
-❌ Line 23: NO DETECTION. Content: "23. Nagłówek auth: Authorization: Basic YWxhZGRpbj..."
-❌ Line 24: NO DETECTION. Content: "24. Token JWT: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ..."
-✅ Line 25: Detected email
-❌ Line 26: NO DETECTION. Content: "26. Karta kredytowa: 4444 4444 4444 4444..."
-❌ Line 27: NO DETECTION. Content: "27. SSN pracownika: 123-45-6789..."
-✅ Line 28: Detected generic-api-key
-❌ Line 29: NO DETECTION. Content: "29. Bearer token: bearer 1234567890abcdef123456789..."
-✅ Line 30: Detected generic-api-key
-
-Results: 15 Passed, 15 Failed
