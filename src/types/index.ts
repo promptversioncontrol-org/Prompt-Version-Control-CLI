@@ -4,7 +4,8 @@ export interface PVCConfig {
   };
   createdAt: string;
   lastSessionId: string;
-  userid:string
+  userId: string;
+  username: string;
 }
 
 export interface FileEdit {
@@ -12,11 +13,15 @@ export interface FileEdit {
   path: string;
   oldContent: string;
   newContent: string;
-  isNewFile: boolean;  // ← DODAJ TO
+  isNewFile: boolean; // ← DODAJ TO
 }
 export interface UserPrompt {
   timestamp: string;
   text: string;
+  context?: string;
+  activeFile?: string;
+  activeSelection?: string;
+  openTabs?: string[];
 }
 
 export interface AssistantMessage {

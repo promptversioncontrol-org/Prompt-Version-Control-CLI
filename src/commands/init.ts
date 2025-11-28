@@ -1,6 +1,6 @@
-import { existsSync, mkdirSync, writeFileSync } from "fs";
-import { getPVCDir, getReportsDir, getConfigPath } from "../utils/path-utils";
-import type { PVCConfig } from "../types";
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import { getPVCDir, getReportsDir, getConfigPath } from '../utils/path-utils';
+import type { PVCConfig } from '../types';
 
 export function initCommand(cwd: string): void {
   const pvcDir = getPVCDir(cwd);
@@ -15,10 +15,11 @@ export function initCommand(cwd: string): void {
   // Create config.json
   if (!existsSync(configPath)) {
     const config: PVCConfig = {
-      remote: { url: "" },
+      remote: { url: '' },
       createdAt: new Date().toISOString(),
-      lastSessionId: "",
-      userid:""
+      lastSessionId: '',
+      userId: '',
+      username: '',
     };
     writeFileSync(configPath, JSON.stringify(config, null, 2));
   }
@@ -28,6 +29,6 @@ export function initCommand(cwd: string): void {
     mkdirSync(reportsDir, { recursive: true });
   }
 
-  console.log("✔ PVC initialized");
+  console.log('✔ PVC initialized');
   console.log(`Created: ${pvcDir}`);
 }

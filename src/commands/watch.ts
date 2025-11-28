@@ -1,13 +1,33 @@
-import { existsSync, readFileSync, writeFileSync, unlinkSync, statSync } from "fs";
-import path from "path";
-import { spawn, spawnSync } from "child_process";
-import { findCodexSessionFile } from "../utils/file-finder";
-import { getPVCDir, getConfigPath, getReportsDir } from "../utils/path-utils";
-import { parseJSONLFile, extractUserPrompts, extractAssistantMessages, extractFileEdits } from "../utils/jsonl-parser";
-import { generateMarkdownReport } from "../generators/markdown-generator";
-import { generateJSONReport } from "../generators/json-generator";
-import { loadCheckpoint, saveCheckpoint, getLastTimestamp } from "../utils/checkpoint";
-import type { SessionReport } from "../types";
+import {
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  unlinkSync,
+  statSync,
+  mkdirSync,
+} from 'fs';
+import path from 'path';
+import { spawn, spawnSync } from 'child_process';
+import { findCodexSessionFile } from '../utils/file-finder';
+import {
+  getPVCDir,
+  getConfigPath,
+  getReportsDir,
+  getDailyReportDir,
+} from '../utils/path-utils';
+import {
+  parseJSONLFile,
+  extractUserPrompts,
+  extractAssistantMessages,
+  extractFileEdits,
+} from '../utils/jsonl-parser';
+import { generateMarkdownReport } from '../generators/markdown-generator';
+import {
+  loadCheckpoint,
+  saveCheckpoint,
+  getLastTimestamp,
+} from '../utils/checkpoint';
+import type { SessionReport } from '../types';
 
 interface PVCConfigFile {
   remote?: { url?: string };
@@ -18,14 +38,14 @@ function readConfig(cwd: string): PVCConfigFile {
   const configPath = getConfigPath(cwd);
   if (!existsSync(configPath)) return {};
   try {
-    return JSON.parse(readFileSync(configPath, "utf8")) as PVCConfigFile;
+    return JSON.parse(readFileSync(configPath, 'utf8')) as PVCConfigFile;
   } catch {
     return {};
   }
 }
 
 function getPidPath(cwd: string): string {
-  return path.join(getPVCDir(cwd), "watch.pid");
+  return path.join(getPVCDir(cwd), 'watch.pid');
 }
 
 function isProcessRunning(pid: number): boolean {
@@ -38,68 +58,64 @@ function isProcessRunning(pid: number): boolean {
 }
 
 function getWatchDir(cwd: string, sessionId: string): string {
-  const reportsRootDir = getReportsDir(cwd);
-  const sessionReportsDir = path.join(reportsRootDir, sessionId);
-  const watchDirPath = path.join(sessionReportsDir, "watch-dir.txt");
+  const watchDir = getDailyReportDir(cwd, sessionId);
 
-  // Check if we have an active watch directory
-  if (existsSync(watchDirPath)) {
-    const savedDir = readFileSync(watchDirPath, "utf-8").trim();
-    if (existsSync(savedDir)) {
-      return savedDir;
-    }
+  if (!existsSync(watchDir)) {
+    mkdirSync(watchDir, { recursive: true });
   }
 
-  // Create new watch directory with timestamp
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const newWatchDir = path.join(sessionReportsDir, `watch-${timestamp}`);
-
-  if (!existsSync(newWatchDir)) {
-    require("fs").mkdirSync(newWatchDir, { recursive: true });
-  }
-
-  // Save the watch directory path
-  writeFileSync(watchDirPath, newWatchDir, "utf-8");
-
-  return newWatchDir;
+  return watchDir;
 }
 
-function clearWatchDir(cwd: string, sessionId: string): void {
-  const reportsRootDir = getReportsDir(cwd);
-  const sessionReportsDir = path.join(reportsRootDir, sessionId);
-  const watchDirPath = path.join(sessionReportsDir, "watch-dir.txt");
+// clearWatchDir and getExistingWatchDir are no longer needed
 
-  if (existsSync(watchDirPath)) {
-    unlinkSync(watchDirPath);
-  }
-}
-
-function getExistingWatchDir(cwd: string, sessionId: string): string | null {
-  const reportsRootDir = getReportsDir(cwd);
-  const sessionReportsDir = path.join(reportsRootDir, sessionId);
-  const watchDirPath = path.join(sessionReportsDir, "watch-dir.txt");
-
-  if (!existsSync(watchDirPath)) return null;
-
-  const savedDir = readFileSync(watchDirPath, "utf-8").trim();
-  return existsSync(savedDir) ? savedDir : null;
-}
-
-function getReportFilePaths(cwd: string, sessionId: string): { jsonPath: string; mdPath: string } {
+function getReportFilePaths(
+  cwd: string,
+  sessionId: string,
+): { jsonPath: string; mdPath: string } {
   const watchDir = getWatchDir(cwd, sessionId);
 
   return {
-    jsonPath: path.join(watchDir, "report.json"),
-    mdPath: path.join(watchDir, "report.md")
+    jsonPath: path.join(watchDir, 'report.json'),
+    mdPath: path.join(watchDir, 'report.md'),
   };
 }
 
-async function updateReports(cwd: string, sessionId: string, sessionFile: string) {
+function updateJsonFile(jsonPath: string, report: SessionReport) {
+  if (existsSync(jsonPath)) {
+    const existingJson = readFileSync(jsonPath, 'utf-8');
+    let existingData: any;
+
+    try {
+      existingData = JSON.parse(existingJson);
+    } catch {
+      existingData = { updates: [] };
+    }
+
+    if (!Array.isArray(existingData.updates)) {
+      existingData = { updates: [existingData] };
+    }
+
+    existingData.updates.push(report);
+    writeFileSync(jsonPath, JSON.stringify(existingData, null, 2), 'utf-8');
+  } else {
+    writeFileSync(
+      jsonPath,
+      JSON.stringify({ updates: [report] }, null, 2),
+      'utf-8',
+    );
+  }
+}
+async function updateReports(
+  cwd: string,
+  sessionId: string,
+  sessionFile: string,
+) {
   const reportsRootDir = getReportsDir(cwd);
   const sessionReportsDir = path.join(reportsRootDir, sessionId);
 
   if (!existsSync(sessionReportsDir)) {
-    require("fs").mkdirSync(sessionReportsDir, { recursive: true });
+    mkdirSync(sessionReportsDir, { recursive: true });
   }
 
   // Parse all events
@@ -111,17 +127,19 @@ async function updateReports(cwd: string, sessionId: string, sessionFile: string
 
   if (checkpoint?.lastTimestamp) {
     const last = new Date(checkpoint.lastTimestamp).getTime();
-    events = allEvents.filter(e => {
+    events = allEvents.filter((e) => {
       if (!e.timestamp) return false;
       return new Date(e.timestamp).getTime() > last;
     });
 
     if (events.length === 0) {
-      console.log("ℹ️  No new events since last checkpoint");
+      console.log('ℹ️  No new events since last checkpoint');
       return;
     }
 
-    console.log(`📊 Found ${events.length} new events (${allEvents.length} total)`);
+    console.log(
+      `📊 Found ${events.length} new events (${allEvents.length} total)`,
+    );
   } else {
     console.log(`📊 Processing ${events.length} events (first watch run)`);
   }
@@ -144,57 +162,45 @@ async function updateReports(cwd: string, sessionId: string, sessionFile: string
     reasonings: [],
     patches: [],
     shellCommands: [],
-    fileEdits
+    fileEdits,
   };
 
   const { jsonPath, mdPath } = getReportFilePaths(cwd, sessionId);
 
   // Generate new content for this update
-  const newJsonContent = generateJSONReport(report);
   const newMdContent = generateMarkdownReport(report);
 
   // APPEND MODE: add new content to existing files
   if (checkpoint?.lastTimestamp) {
-    // Append to existing JSON (as new entry in array)
-    if (existsSync(jsonPath)) {
-      const existingJson = readFileSync(jsonPath, "utf-8");
-      let existingData: any;
-      
-      try {
-        existingData = JSON.parse(existingJson);
-      } catch {
-        existingData = { updates: [] };
-      }
-
-      if (!Array.isArray(existingData.updates)) {
-        existingData = { updates: [existingData] };
-      }
-
-      existingData.updates.push(report);
-      writeFileSync(jsonPath, JSON.stringify(existingData, null, 2), "utf-8");
-    } else {
-      writeFileSync(jsonPath, JSON.stringify({ updates: [report] }, null, 2), "utf-8");
-    }
-
-    // Append to existing Markdown
     if (existsSync(mdPath)) {
-      const existingMd = readFileSync(mdPath, "utf-8");
-      const separator = "\n\n---\n\n# 📝 Update at " + nowIso + "\n\n";
-      
-      // Remove the header from new content (keep only timeline)
-      const timelineStart = newMdContent.indexOf("## Session Timeline");
-      const timelineContent = timelineStart !== -1 
-        ? newMdContent.substring(timelineStart + "## Session Timeline".length).trim()
-        : newMdContent;
-      
-      writeFileSync(mdPath, existingMd + separator + timelineContent, "utf-8");
+      const existingMd = readFileSync(mdPath, 'utf-8');
+
+      // Wyciągnij tylko timeline z nowego contentu
+      const timelineStart = newMdContent.indexOf('## Session Timeline');
+      const timelineContent =
+        timelineStart !== -1
+          ? newMdContent
+              .substring(timelineStart + '## Session Timeline'.length)
+              .trim()
+          : newMdContent;
+
+      // ZAWSZE dopisuj nowe zdarzenia do końca pliku bez nagłówka "Update at"
+      writeFileSync(mdPath, existingMd + '\n\n' + timelineContent, 'utf-8');
     } else {
-      writeFileSync(mdPath, newMdContent, "utf-8");
+      // Pierwszy zapis
+      writeFileSync(mdPath, newMdContent, 'utf-8');
     }
+
+    // JSON - zawsze jako array updates
+    updateJsonFile(jsonPath, report);
   } else {
     // First run: create new files
-    writeFileSync(jsonPath, JSON.stringify({ updates: [report] }, null, 2), "utf-8");
-    writeFileSync(mdPath, newMdContent, "utf-8");
+    writeFileSync(mdPath, newMdContent, 'utf-8');
+    writeFileSync(
+      jsonPath,
+      JSON.stringify({ updates: [report] }, null, 2),
+      'utf-8',
+    );
   }
 
   console.log(`✅ Reports updated`);
@@ -205,12 +211,12 @@ async function updateReports(cwd: string, sessionId: string, sessionFile: string
   const lastTimestamp = getLastTimestamp(allEvents);
   const watchDir = getWatchDir(cwd, sessionId);
   const watchDirName = path.basename(watchDir);
-  
+
   saveCheckpoint(sessionReportsDir, {
     sessionId,
     lastTimestamp,
     lastReportAt: nowIso,
-    lastReport: watchDirName
+    lastReport: watchDirName,
   });
 
   // Send to backend
@@ -220,18 +226,28 @@ async function updateReports(cwd: string, sessionId: string, sessionFile: string
 function createZipArchive(files: string[], cwd: string): Buffer {
   const tempZip = path.join(getPVCDir(cwd), `watch-report-${Date.now()}.zip`);
 
-  if (process.platform === "win32") {
-    const ps = spawnSync("powershell", [
-      "-NoLogo",
-      "-NoProfile",
-      "-Command",
-      `Compress-Archive -Path ${files.map(f => `"${f}"`).join(",")} -DestinationPath "${tempZip}" -Force`
-    ]);
+  if (process.platform === 'win32') {
+    const ps = spawnSync(
+      'powershell',
+      [
+        '-NoLogo',
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        `Compress-Archive -Path ${files.map((f) => `"${f}"`).join(',')} -DestinationPath "${tempZip}" -Force`,
+      ],
+      {
+        windowsHide: true,
+        stdio: 'pipe',
+      },
+    );
     if (ps.status !== 0) {
-      throw new Error(`Compress-Archive failed: ${ps.stderr?.toString() || ps.status}`);
+      throw new Error(
+        `Compress-Archive failed: ${ps.stderr?.toString() || ps.status}`,
+      );
     }
   } else {
-    const zip = spawnSync("zip", ["-j", tempZip, ...files]);
+    const zip = spawnSync('zip', ['-j', tempZip, ...files]);
     if (zip.status !== 0) {
       throw new Error(`zip failed: ${zip.stderr?.toString() || zip.status}`);
     }
@@ -246,12 +262,17 @@ function createZipArchive(files: string[], cwd: string): Buffer {
   return buf;
 }
 
-async function sendToBackend(cwd: string, sessionId: string, jsonPath: string, mdPath: string) {
+async function sendToBackend(
+  cwd: string,
+  sessionId: string,
+  jsonPath: string,
+  mdPath: string,
+) {
   const cfg = readConfig(cwd);
   const endpoint = cfg.remote?.url;
 
   if (!endpoint) {
-    console.log("ℹ️ No backend URL configured (remote.url). Skipping upload.");
+    console.log('ℹ️ No backend URL configured (remote.url). Skipping upload.');
     return;
   }
 
@@ -259,31 +280,37 @@ async function sendToBackend(cwd: string, sessionId: string, jsonPath: string, m
     const zipBuffer = createZipArchive([jsonPath, mdPath], cwd);
 
     const form = new (globalThis as any).FormData();
-    form.append("sessionId", sessionId);
-    form.append("cwd", cwd);
-    form.append("timestamp", new Date().toISOString());
+    form.append('sessionId', sessionId);
+    form.append('cwd', cwd);
+    form.append('timestamp', new Date().toISOString());
     form.append(
-      "uploadedFile",
-      new (globalThis as any).Blob([zipBuffer], { type: "application/zip" }),
-      `watch-${sessionId}.zip`
+      'uploadedFile',
+      new (globalThis as any).Blob([zipBuffer], { type: 'application/zip' }),
+      `watch-${sessionId}.zip`,
     );
 
-    const response = await fetch("http://localhost:5000/upload", {
-      method: "POST",
-      body: form
+    const response = await fetch('http://localhost:5000/upload', {
+      method: 'POST',
+      body: form,
     });
 
     if (response.ok) {
-      console.log("✅ Report uploaded to backend");
+      console.log('✅ Report uploaded to backend');
     } else {
-      console.error(`❌ Backend error ${response.status}: ${await response.text()}`);
+      console.error(
+        `❌ Backend error ${response.status}: ${await response.text()}`,
+      );
     }
   } catch (error) {
-    console.error("❌ Failed to send to backend:", error);
+    console.error('❌ Failed to send to backend:', error);
   }
 }
 
-async function runWatchLoop(cwd: string, sessionId: string, intervalMs: number = 3000) {
+async function runWatchLoop(
+  cwd: string,
+  sessionId: string,
+  intervalMs: number = 3000,
+) {
   const watchDir = getWatchDir(cwd, sessionId);
   const watchDirName = path.basename(watchDir);
 
@@ -302,9 +329,9 @@ async function runWatchLoop(cwd: string, sessionId: string, intervalMs: number =
       if (!sessionFile) {
         notFoundCount++;
         if (notFoundCount === 1) {
-          console.log("⏳ Waiting for session file to appear...");
+          console.log('⏳ Waiting for session file to appear...');
         }
-        await new Promise(r => setTimeout(r, intervalMs));
+        await new Promise((r) => setTimeout(r, intervalMs));
         continue;
       }
 
@@ -317,30 +344,32 @@ async function runWatchLoop(cwd: string, sessionId: string, intervalMs: number =
 
       if (stat.mtimeMs > lastMtime) {
         lastMtime = stat.mtimeMs;
-        console.log(`\n🔔 New activity detected at ${new Date().toLocaleTimeString()}`);
+        console.log(
+          `\n🔔 New activity detected at ${new Date().toLocaleTimeString()}`,
+        );
         await updateReports(cwd, sessionId, sessionFile);
-        console.log("");
+        console.log('');
       }
     } catch (err) {
       console.error(`❌ Error: ${(err as Error).message}`);
     }
 
-    await new Promise(r => setTimeout(r, intervalMs));
+    await new Promise((r) => setTimeout(r, intervalMs));
   }
 }
 
 function startDaemon(cwd: string, sessionId: string) {
-  const isBun = process.execPath.toLowerCase().includes("bun");
+  const isBun = process.execPath.toLowerCase().includes('bun');
   const entry = process.argv[1];
   const args = isBun
-    ? [entry, "watch", "--daemon", `--session=${sessionId}`]
-    : ["watch", "--daemon", `--session=${sessionId}`];
+    ? [entry, 'watch', '--daemon', `--session=${sessionId}`]
+    : ['watch', '--daemon', `--session=${sessionId}`];
 
   const child = spawn(process.execPath, args, {
     cwd,
     detached: true,
-    stdio: "ignore",
-    windowsHide: true
+    stdio: 'ignore',
+    windowsHide: true,
   });
 
   child.unref();
@@ -351,20 +380,20 @@ function startDaemon(cwd: string, sessionId: string) {
 async function stopDaemon(cwd: string): Promise<void> {
   const pidPath = getPidPath(cwd);
   if (!existsSync(pidPath)) {
-    console.log("ℹ️  No watch daemon running");
+    console.log('ℹ️  No watch daemon running');
     return;
   }
 
-  const pid = Number(readFileSync(pidPath, "utf8").trim());
+  const pid = Number(readFileSync(pidPath, 'utf8').trim());
 
   if (!pid || Number.isNaN(pid)) {
-    console.log("⚠️  Invalid PID file, removing...");
+    console.log('⚠️  Invalid PID file, removing...');
     unlinkSync(pidPath);
     return;
   }
 
   if (!isProcessRunning(pid)) {
-    console.log("ℹ️  Watch daemon not running (stale PID)");
+    console.log('ℹ️  Watch daemon not running (stale PID)');
     unlinkSync(pidPath);
     return;
   }
@@ -383,8 +412,6 @@ async function stopDaemon(cwd: string): Promise<void> {
   }
 
   // After stopping, try to upload the latest report (if exists)
-  const config = readConfig(cwd);
-  const sessionId = config.lastSessionId;
   // if (sessionId) {
   //   const watchDir = getExistingWatchDir(cwd, sessionId);
   //   if (watchDir) {
@@ -402,17 +429,17 @@ async function stopDaemon(cwd: string): Promise<void> {
 export async function watchCommand(cwd: string, args: string[]): Promise<void> {
   const subcommand = args[0];
 
-  if (subcommand === "stop") {
+  if (subcommand === 'stop') {
     await stopDaemon(cwd);
     return;
   }
 
-  if (subcommand === "--daemon") {
-    const sessionIdArg = args.find(a => a.startsWith("--session="));
-    const sessionId = sessionIdArg?.replace("--session=", "") || "";
+  if (subcommand === '--daemon') {
+    const sessionIdArg = args.find((a) => a.startsWith('--session='));
+    const sessionId = sessionIdArg?.replace('--session=', '') || '';
 
     if (!sessionId) {
-      console.error("❌ No session ID provided to daemon");
+      console.error('❌ No session ID provided to daemon');
       process.exit(1);
     }
 
@@ -423,7 +450,7 @@ export async function watchCommand(cwd: string, args: string[]): Promise<void> {
   // Start mode
   const pidPath = getPidPath(cwd);
   if (existsSync(pidPath)) {
-    const pid = Number(readFileSync(pidPath, "utf8").trim());
+    const pid = Number(readFileSync(pidPath, 'utf8').trim());
     if (pid && isProcessRunning(pid)) {
       console.log(`ℹ️  Watch daemon already running (PID: ${pid})`);
       console.log(`   Use 'pvc watch stop' to stop it`);

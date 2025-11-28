@@ -9,10 +9,28 @@
     "build": "bun build.ts",
     "build:windows": "bun build ./src/index.ts --compile --target=bun-windows-x64 --outfile=pvc.exe",
     "build:linux": "bun build ./src/index.ts --compile --target=bun-linux-x64 --outfile=pvc",
-    "build:mac": "bun build ./src/index.ts --compile --target=bun-darwin-x64 --outfile=pvc"
+    "build:mac": "bun build ./src/index.ts --compile --target=bun-darwin-x64 --outfile=pvc",
+    "prepare": "husky"
   },
-  "keywords": ["pvc", "version-control", "ai", "codex"],
+  "keywords": [
+    "pvc",
+    "version-control",
+    "ai",
+    "codex"
+  ],
   "author": "Adam Pukaluk",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.940.0",
+    "@aws-sdk/s3-request-presigner": "^3.940.0",
+    "@commitlint/config-conventional": "^20.0.0",
+    "dotenv": "^17.2.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@typescript-eslint/eslint-plugin": "^8.48.0",
+    "@typescript-eslint/parser": "^8.48.0",
+    "eslint": "^9.39.1",
+    "prettier": "^3.7.1"
+  }
 }
-

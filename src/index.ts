@@ -1,10 +1,17 @@
 #!/usr/bin/env bun
-import { initCommand, generateReportCommand } from "./commands";
-import { watchCommand } from "./commands";
-import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "fs";
-import path from "path";
-import { getCodexSessionsRoot } from "./utils/path-utils";
-import { loginSSHCommand } from "./commands/login";
+import { initCommand, generateReportCommand } from './commands';
+import { watchCommand } from './commands';
+import {
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  readdirSync,
+  statSync,
+} from 'fs';
+import path from 'path';
+import { getCodexSessionsRoot } from './utils/path-utils';
+import { loginSSHCommand } from './commands/login';
+import { pushCommand } from './commands/push';
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -12,7 +19,7 @@ const subcommand = args[1];
 const cwd = process.cwd();
 
 function ensurePVC() {
-  const pvcDir = path.join(cwd, ".pvc");
+  const pvcDir = path.join(cwd, '.pvc');
   if (!existsSync(pvcDir)) {
     console.error("❌ PVC not initialized. Run 'pvc init' first.");
     process.exit(1);
@@ -21,46 +28,66 @@ function ensurePVC() {
 }
 
 function getConfig(pvcDir: string) {
-  const configPath = path.join(pvcDir, "config.json");
+  const configPath = path.join(pvcDir, 'config.json');
   if (!existsSync(configPath)) {
-    console.error("❌ Config file not found.");
+    console.error('❌ Config file not found.');
     process.exit(1);
   }
-  const config = JSON.parse(readFileSync(configPath, "utf8"));
+  const config = JSON.parse(readFileSync(configPath, 'utf8'));
   if (config.lastSessionId === undefined) {
-    config.lastSessionId = "";
+    config.lastSessionId = '';
   }
   if (!config.remote) {
-    config.remote = { url: "" };
+    config.remote = { url: '' };
   }
   return config;
 }
 
 function saveConfig(pvcDir: string, config: any) {
-  const configPath = path.join(pvcDir, "config.json");
+  const configPath = path.join(pvcDir, 'config.json');
   writeFileSync(configPath, JSON.stringify(config, null, 2));
 }
 
 async function main() {
   try {
     switch (command) {
-      case "init":
+      case 'init':
         initCommand(cwd);
         break;
 
-      case "update-conv": {
+      case 'update-conv': {
         const pvcDir = ensurePVC();
         const config = getConfig(pvcDir);
 
         const sessionsRoot = getCodexSessionsRoot();
         if (!sessionsRoot) {
-          console.error("❌ Codex sessions directory not found (.codex/sessions).");
+          console.error(
+            '❌ Codex sessions directory not found (.codex/sessions).',
+          );
           process.exit(1);
         }
 
-        // Recursively find latest .jsonl session file by mtime
+        // Recursively find latest .jsonl session file by encoded timestamp (fall back to mtime)
         let latestPath: string | null = null;
-        let latestMtime = 0;
+        let latestSessionId: string | null = null;
+        let latestTimestamp = 0;
+
+        const parseSessionMeta = (fileName: string) => {
+          const match = fileName.match(
+            /rollout-([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9-]{8})-([0-9a-fA-F-]{36})\.jsonl$/,
+          );
+          if (!match) return null;
+
+          const [datePart, timePartRaw] = match[1].split('T');
+          const timePart = timePartRaw?.replace(/-/g, ':');
+          if (!datePart || !timePart) return null;
+
+          const iso = `${datePart}T${timePart}Z`;
+          const parsed = Date.parse(iso);
+          if (Number.isNaN(parsed)) return null;
+
+          return { ts: parsed, sessionId: match[2] };
+        };
 
         function walk(dir: string) {
           const entries = readdirSync(dir, { withFileTypes: true });
@@ -68,12 +95,15 @@ async function main() {
             const fullPath = path.join(dir, entry.name);
             if (entry.isDirectory()) {
               walk(fullPath);
-            } else if (entry.isFile() && entry.name.endsWith(".jsonl")) {
+            } else if (entry.isFile() && entry.name.endsWith('.jsonl')) {
               const stat = statSync(fullPath);
-              const mtime = stat.mtimeMs;
-              if (mtime > latestMtime) {
-                latestMtime = mtime;
+              const meta = parseSessionMeta(entry.name);
+              const candidateTs = meta?.ts ?? stat.mtimeMs;
+
+              if (candidateTs > latestTimestamp) {
+                latestTimestamp = candidateTs;
                 latestPath = fullPath;
+                latestSessionId = meta?.sessionId ?? null;
               }
             }
           }
@@ -82,37 +112,45 @@ async function main() {
         walk(sessionsRoot);
 
         if (!latestPath) {
-          console.error("❌ No .jsonl session files found in Codex sessions directory.");
+          console.error(
+            '❌ No .jsonl session files found in Codex sessions directory.',
+          );
           process.exit(1);
         }
 
+        // Prefer sessionId parsed from filename timestamp; fall back to suffix-only parsing
+        let lastSessionId = latestSessionId;
         const latestName = path.basename(latestPath);
-        const match = latestName.match(/.*-([0-9a-fA-F-]{36})\.jsonl$/);
-        const lastSessionId = match ? match[1] : null;
+        if (!lastSessionId) {
+          const match = latestName.match(/.*-([0-9a-fA-F-]{36})\.jsonl$/);
+          lastSessionId = match ? match[1] : null;
+        }
 
         if (!lastSessionId) {
-          console.error(`❌ Could not extract session_id from file name: ${latestName}`);
+          console.error(
+            `❌ Could not extract session_id from file name: ${latestName}`,
+          );
           process.exit(1);
         }
 
         config.lastSessionId = lastSessionId;
         saveConfig(pvcDir, config);
 
-        console.log("✅ Updated lastSessionId in config.json");
+        console.log('✅ Updated lastSessionId in config.json');
         console.log(`🔗 Session ID: ${lastSessionId}`);
         break;
       }
 
-      case "remote": {
+      case 'remote': {
         const pvcDir = ensurePVC();
 
-        if (subcommand === "add") {
+        if (subcommand === 'add') {
           const url = args[2];
           if (!url) {
-            console.error("❌ remote add requires URL");
-            console.log("\nUsage: pvc remote add <url>");
-            console.log("\nExample:");
-            console.log("  pvc remote add https://github.com/user/repo.git");
+            console.error('❌ remote add requires URL');
+            console.log('\nUsage: pvc remote add <url>');
+            console.log('\nExample:');
+            console.log('  pvc remote add https://github.com/user/repo.git');
             process.exit(1);
           }
 
@@ -125,20 +163,20 @@ async function main() {
           config.remote.url = url;
           saveConfig(pvcDir, config);
 
-          console.log("✅ Remote added");
+          console.log('✅ Remote added');
           console.log(`🔗 URL: ${url}`);
-        } else if (subcommand === "-v" || subcommand === "show") {
+        } else if (subcommand === '-v' || subcommand === 'show') {
           const config = getConfig(pvcDir);
 
           if (config.remote && config.remote.url) {
-            console.log("🔗 Remote URL:");
+            console.log('🔗 Remote URL:');
             console.log(`   ${config.remote.url}`);
           } else {
-            console.log("ℹ️ No remote configured");
-            console.log("\nTo add a remote, use:");
-            console.log("  pvc remote add <url>");
+            console.log('ℹ️ No remote configured');
+            console.log('\nTo add a remote, use:');
+            console.log('  pvc remote add <url>');
           }
-        } else if (subcommand === "remove" || subcommand === "rm") {
+        } else if (subcommand === 'remove' || subcommand === 'rm') {
           const config = getConfig(pvcDir);
 
           if (config.remote && config.remote.url) {
@@ -149,23 +187,25 @@ async function main() {
             }
             saveConfig(pvcDir, config);
 
-            console.log("✅ Remote removed");
+            console.log('✅ Remote removed');
             console.log(`🗑️ Removed: ${oldUrl}`);
           } else {
-            console.log("ℹ️ No remote configured to remove");
+            console.log('ℹ️ No remote configured to remove');
           }
         } else {
           console.error(`❌ Unknown remote subcommand: ${subcommand}`);
-          console.log("\nAvailable remote commands:");
-          console.log("  pvc remote add <url>    - Add remote repository URL");
-          console.log("  pvc remote -v           - Show current remote URL");
-          console.log("  pvc remote remove       - Remove remote URL from config");
+          console.log('\nAvailable remote commands:');
+          console.log('  pvc remote add <url>    - Add remote repository URL');
+          console.log('  pvc remote -v           - Show current remote URL');
+          console.log(
+            '  pvc remote remove       - Remove remote URL from config',
+          );
           process.exit(1);
         }
         break;
       }
 
-      case "generate": {
+      case 'generate': {
         const pvcDir = ensurePVC();
         const config = getConfig(pvcDir);
 
@@ -177,24 +217,28 @@ async function main() {
         for (let i = 0; i < argList.length; i++) {
           const a = argList[i];
 
-          if (a === "-id" || a === "--id") {
+          if (a === '-id' || a === '--id') {
             sessionId = argList[i + 1];
             i++;
-          } else if (a === "-last" || a === "--last") {
+          } else if (a === '-last' || a === '--last') {
             const possibleNumber = argList[i + 1];
-            if (possibleNumber && !possibleNumber.startsWith("-") && !isNaN(Number(possibleNumber))) {
+            if (
+              possibleNumber &&
+              !possibleNumber.startsWith('-') &&
+              !isNaN(Number(possibleNumber))
+            ) {
               lastCount = Math.max(1, Number(possibleNumber));
               i++;
             } else {
               lastCount = 1;
             }
-          } else if (a === "-m" || a === "--message" || a === "--name") {
+          } else if (a === '-m' || a === '--message' || a === '--name') {
             reportName = argList[i + 1];
             i++;
-          } else if (a === "report") {
+          } else if (a === 'report') {
             // Backwards compatibility: ignore old "report" subcommand
             continue;
-          } else if (!a.startsWith("-")) {
+          } else if (!a.startsWith('-')) {
             // Fallback: support old positional usage generate report <id> <name>
             if (!sessionId) {
               sessionId = a;
@@ -208,55 +252,69 @@ async function main() {
           if (config.lastSessionId) {
             sessionId = config.lastSessionId;
           } else {
-            console.error("❌ Error: No session ID provided and config.lastSessionId is empty.");
-            console.log("\nOptions:");
-            console.log("  - Use last known session:");
-            console.log("      pvc update-conv");
-            console.log("      pvc generate -m \"init report\"");
-            console.log("  - Or specify session explicitly:");
-            console.log("      pvc generate -id <sessionId> -m \"report name\"");
+            console.error(
+              '❌ Error: No session ID provided and config.lastSessionId is empty.',
+            );
+            console.log('\nOptions:');
+            console.log('  - Use last known session:');
+            console.log('      pvc update-conv');
+            console.log('      pvc generate -m "init report"');
+            console.log('  - Or specify session explicitly:');
+            console.log('      pvc generate -id <sessionId> -m "report name"');
             process.exit(1);
           }
         }
 
         if (!reportName) {
-          console.error("❌ Error: Missing report name (-m).");
-          console.log("\nUsage:");
-          console.log("  pvc generate -m \"My report\"");
-          console.log("  pvc generate -id <sessionId> -m \"My report\"");
+          console.error('❌ Error: Missing report name (-m).');
+          console.log('\nUsage:');
+          console.log('  pvc generate -m "My report"');
+          console.log('  pvc generate -id <sessionId> -m "My report"');
           process.exit(1);
         }
 
-        console.log(`⚙️ Generating report "${reportName}" for session: ${sessionId}`);
+        console.log(
+          `⚙️ Generating report "${reportName}" for session: ${sessionId}`,
+        );
 
-        const result = await generateReportCommand(sessionId, reportName, cwd, {
-          lastCount: lastCount ?? undefined
-        });
+        const result = await generateReportCommand(
+          sessionId,
+          reportName!,
+          cwd,
+          {
+            lastCount: lastCount ?? undefined,
+          },
+        );
 
-        console.log("\n✅ Report generated:");
+        console.log('\n✅ Report generated:');
         console.log(`📄 JSON: ${result.jsonPath}`);
         console.log(`📄 Markdown: ${result.mdPath}`);
         break;
       }
 
-      case "watch": {
-        const pvcDir = ensurePVC();
+      case 'watch': {
+        ensurePVC();
         const sub = args[1];
-        if (sub === "stop") {
-          await watchCommand(cwd, ["stop"]);
+        if (sub === 'stop') {
+          await watchCommand(cwd, ['stop']);
         } else {
           await watchCommand(cwd, args.slice(1));
         }
         break;
       }
-      case "login":
-        if (subcommand === "--ssh") {
-          const backendUrl = "http://localhost:3000"; // ustaw swój URL
+      case 'login':
+        if (subcommand === '--ssh') {
+          const backendUrl = 'http://localhost:3000'; // ustaw swój URL
           await loginSSHCommand(cwd, backendUrl);
         } else {
-          console.log("Usage: pvc login --ssh");
+          console.log('Usage: pvc login --ssh');
         }
         break;
+
+      case 'push':
+        await pushCommand(cwd);
+        break;
+
       default:
         showHelp();
     }
@@ -272,8 +330,9 @@ function showHelp() {
 Usage:
   pvc init                                      Initialize PVC in current directory
   pvc update-conv                               Save last Codex session ID to config
-  pvc generate -m "<name>"                      Generate report (uses lastSessionId)
+  pvc generate -m "<name>"                      Generate report using lastSessionId
   pvc generate -id <sessionId> -m "<name>"      Generate report for specific session
+  pvc generate -last [N] -m "<name>"            Use last N user/assistant messages
 
   pvc remote add <url>                          Add remote repository URL
   pvc remote -v                                 Show current remote URL
@@ -282,6 +341,9 @@ Usage:
   pvc watch                                     Start background watcher (uses lastSessionId)
   pvc watch --session=<id>                      Start watcher for specific session
   pvc watch stop                                Stop running watcher
+
+  pvc login --ssh                               Log in using SSH key challenge/response
+  pvc push                                      Upload daily reports to remote backend
 
 Examples:
   pvc init
@@ -292,9 +354,9 @@ Examples:
   pvc remote -v
   pvc remote remove
   pvc watch
-
-  pvc login
+  pvc login --ssh
+  pvc push
 `);
 }
 
-main();
+void main();

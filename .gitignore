@@ -24,3 +24,9 @@ Thumbs.db
 *.log
 npm-debug.log*
 
+*tmp*
+
+.env
+key.json
+*.pem
+*.key
