@@ -36,3 +36,6 @@ key.json
 *sensitive_examples.txt
 *debug-output.txt
 *debug-output-2.txt
+*debug*
+*debug-2*
+*.txt
