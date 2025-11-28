@@ -1,4 +1,4 @@
-import { checkPromptBeforeSend } from './utils/risk-analyzer';
+import { checkPromptBeforeSend } from './risk-analysis/index';
 import path from 'path';
 
 // This script simulates a client application (like an IDE plugin or a chatbot)

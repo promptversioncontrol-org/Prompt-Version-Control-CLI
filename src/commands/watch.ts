@@ -28,7 +28,7 @@ import {
   getLastTimestamp,
 } from '../utils/checkpoint';
 import type { SessionReport } from '../types';
-import { loadRiskRules, analyzeRisks } from '../utils/risk-analyzer';
+import { loadRiskRules, analyzeRisks } from '../risk-analysis/index';
 import {
   loadBlockedPromptsForSession,
   getBlockedLogPath,
@@ -189,7 +189,7 @@ async function updateReports(
   let maxScore = 0;
 
   const { analyzePromptRealtime, scanFileForSensitiveData } =
-    await import('../utils/risk-analyzer');
+    await import('../risk-analysis/index');
 
   for (const p of userPrompts) {
     const res = analyzePromptRealtime(p.text || '', cwd);

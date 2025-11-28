@@ -30,9 +30,11 @@ import type {
   RiskFinding,
 } from '../types';
 import {
+  loadRiskRules,
+  analyzeRisks,
   analyzePromptRealtime,
   scanFileForSensitiveData,
-} from '../utils/risk-analyzer';
+} from '../risk-analysis/index';
 
 interface GenerateOptions {
   lastCount?: number;

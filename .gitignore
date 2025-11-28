@@ -30,3 +30,9 @@ npm-debug.log*
 key.json
 *.pem
 *.key
+*.exe
+*.bun-Build
+*.bun-Debug
+*sensitive_examples.txt
+*debug-output.txt
+*debug-output-2.txt

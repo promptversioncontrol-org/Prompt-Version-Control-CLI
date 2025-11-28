@@ -1,4 +1,4 @@
-import type { SessionReport, FileEdit } from '../types';
+import type { SessionReport, FileEdit, RiskFinding } from '../types';
 
 interface DiffLine {
   type: 'unchanged' | 'removed' | 'added';
