@@ -12,6 +12,7 @@ import path from 'path';
 import { getCodexSessionsRoot } from './utils/path-utils';
 import { loginSSHCommand } from './commands/login';
 import { pushCommand } from './commands/push';
+import { ENV } from './config/env';
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -123,7 +124,7 @@ async function main() {
         const latestName = path.basename(latestPath);
         if (!lastSessionId) {
           const match = latestName.match(/.*-([0-9a-fA-F-]{36})\.jsonl$/);
-          lastSessionId = match ? match[1] : null;
+          lastSessionId = match ? match[1] : (null as string | null);
         }
 
         if (!lastSessionId) {
@@ -154,17 +155,49 @@ async function main() {
             process.exit(1);
           }
 
-          const config = getConfig(pvcDir);
+          try {
+            console.log('🔄 Resolving workspace ID...');
+            const res = await fetch(
+              `${ENV.API_URL}/api/workspaces/resolve-id`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url }),
+              },
+            );
 
-          if (!config.remote) {
-            config.remote = {};
+            if (!res.ok) {
+              const errorText = await res.text();
+              throw new Error(`Failed to resolve workspace ID: ${errorText}`);
+            }
+
+            const data = (await res.json()) as {
+              id: string;
+              username: string;
+              workspaceSlug: string;
+            };
+
+            const config = getConfig(pvcDir);
+
+            if (!config.remote) {
+              config.remote = {};
+            }
+
+            config.remote.url = url;
+            config.workspaceId = data.id; // Save workspace ID
+            saveConfig(pvcDir, config);
+
+            console.log('✅ Remote added');
+            console.log(`🔗 URL: ${url}`);
+            console.log(`🆔 Workspace ID: ${data.id}`);
+            console.log(`👤 Username: ${data.username}`);
+            console.log(`slug: ${data.workspaceSlug}`);
+          } catch (error) {
+            console.error(
+              `❌ Error adding remote: ${(error as Error).message}`,
+            );
+            process.exit(1);
           }
-
-          config.remote.url = url;
-          saveConfig(pvcDir, config);
-
-          console.log('✅ Remote added');
-          console.log(`🔗 URL: ${url}`);
         } else if (subcommand === '-v' || subcommand === 'show') {
           const config = getConfig(pvcDir);
 
@@ -279,7 +312,7 @@ async function main() {
 
         const result = await generateReportCommand(
           sessionId,
-          reportName!,
+          reportName as string,
           cwd,
           {
             lastCount: lastCount ?? undefined,
@@ -304,7 +337,7 @@ async function main() {
       }
       case 'login':
         if (subcommand === '--ssh') {
-          const backendUrl = 'http://localhost:3000'; // ustaw swój URL
+          const backendUrl = ENV.API_URL;
           await loginSSHCommand(cwd, backendUrl);
         } else {
           console.log('Usage: pvc login --ssh');
@@ -318,7 +351,7 @@ async function main() {
       case 'risk': {
         const sub = args[1];
         const { analyzePromptRealtime, scanFileForSensitiveData } =
-          await import('./utils/risk-analyzer');
+          await import('./risk-analysis');
 
         if (sub === 'scan-prompt') {
           const text = args.slice(2).join(' ');

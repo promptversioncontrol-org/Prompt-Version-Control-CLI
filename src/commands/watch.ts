@@ -33,10 +33,14 @@ import {
   loadBlockedPromptsForSession,
   getBlockedLogPath,
 } from '../utils/blocked-prompts';
+import { RealTimeReporter } from '../utils/socket-client';
 
 interface PVCConfigFile {
   remote?: { url?: string };
   lastSessionId?: string;
+  sessionToken?: string;
+  workspaceId?: string;
+  username?: string;
 }
 
 function readConfig(cwd: string): PVCConfigFile {
@@ -115,6 +119,8 @@ async function updateReports(
   cwd: string,
   sessionId: string,
   sessionFile: string,
+  reporter: RealTimeReporter,
+  username: string,
 ) {
   console.log('\n🔥 ========== UPDATE REPORTS START ========== 🔥');
 
@@ -203,6 +209,17 @@ async function updateReports(
         const icon =
           f.severity === 'high' ? '🔴' : f.severity === 'medium' ? '🟠' : '🟡';
         console.log(`   ${icon} [${f.severity}] ${f.ruleId}: ${f.message}`);
+
+        reporter.reportLeak({
+          sessionId,
+          ruleId: f.ruleId,
+          severity: f.severity,
+          message: f.message,
+          snippet: f.snippet,
+          source: 'prompt',
+          timestamp: new Date().toISOString(),
+          username,
+        });
       });
     }
   }
@@ -218,6 +235,17 @@ async function updateReports(
         const icon =
           f.severity === 'high' ? '🔴' : f.severity === 'medium' ? '🟠' : '🟡';
         console.log(`   ${icon} [${f.severity}] ${f.ruleId}: ${f.message}`);
+
+        reporter.reportLeak({
+          sessionId,
+          ruleId: f.ruleId,
+          severity: f.severity,
+          message: f.message,
+          snippet: f.snippet,
+          source: 'file',
+          timestamp: new Date().toISOString(),
+          username,
+        });
       });
     }
   }
@@ -340,7 +368,7 @@ async function updateReports(
   });
 
   // Send to backend
-  await sendToBackend(cwd, sessionId, jsonPath, mdPath);
+  // await sendToBackend(cwd, sessionId, jsonPath, mdPath);
 }
 
 function createZipArchive(files: string[], cwd: string): Buffer {
@@ -409,7 +437,7 @@ async function sendToBackend(
       `watch-${sessionId}.zip`,
     );
 
-    const response = await fetch('http://localhost:5000/upload', {
+    const response = await fetch('http://localhost:3000/api/files/upload', {
       method: 'POST',
       body: form,
     });
@@ -438,6 +466,24 @@ async function runWatchLoop(
   console.log(`📁 Watch folder: ${watchDirName}`);
   console.log(`⏱️  Checking every ${intervalMs}ms`);
   console.log(`🛑 Stop with: pvc watch stop\n`);
+
+  console.log(`🛑 Stop with: pvc watch stop\n`);
+
+  const config = readConfig(cwd);
+  console.log('🔧 Loaded config:', {
+    ...config,
+    sessionToken: config.sessionToken ? '***' : 'undefined',
+    workspaceId: config.workspaceId,
+  });
+
+  const reporter = new RealTimeReporter(
+    'http://localhost:3000',
+    {
+      token: config.sessionToken,
+      workspaceId: config.workspaceId,
+    },
+    '/api/socket/io',
+  );
 
   let lastMtime = 0;
   let lastBlockedMtime = 0;
@@ -468,7 +514,13 @@ async function runWatchLoop(
         console.log(
           `\n🔔 New activity detected at ${new Date().toLocaleTimeString()}`,
         );
-        await updateReports(cwd, sessionId, sessionFile);
+        await updateReports(
+          cwd,
+          sessionId,
+          sessionFile,
+          reporter,
+          config.username || 'unknown',
+        );
         console.log('');
       }
 
@@ -490,7 +542,13 @@ async function runWatchLoop(
         if (blockedChanged) {
           console.log('🚫 (Blocked prompts log updated)');
         }
-        await updateReports(cwd, sessionId, sessionFile);
+        await updateReports(
+          cwd,
+          sessionId,
+          sessionFile,
+          reporter,
+          config.username || 'unknown',
+        );
         console.log('');
       }
     } catch (err) {

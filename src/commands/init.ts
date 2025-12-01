@@ -20,6 +20,7 @@ export function initCommand(cwd: string): void {
       lastSessionId: '',
       userId: '',
       username: '',
+      workspaceId: '',
     };
     writeFileSync(configPath, JSON.stringify(config, null, 2));
   }

@@ -39,3 +39,6 @@ key.json
 *debug*
 *debug-2*
 *.txt
+
+
+/src/test

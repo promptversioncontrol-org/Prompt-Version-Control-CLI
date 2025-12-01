@@ -34,4 +34,5 @@ export const ENV = {
   AWS_REGION: getEnvironment('AWS_REGION', false) || 'eu-north-1',
   AWS_BUCKET_NAME: getEnvironment('AWS_BUCKET_NAME', false),
   AWS_KMS_KEY_ID: getEnvironment('AWS_KMS_KEY_ID', false),
+  API_URL: getEnvironment('API_URL', false) || 'http://localhost:3000',
 };

@@ -24,6 +24,27 @@ export const SENSITIVE_PATTERNS: RegexRule[] = [
     category: 'AWS',
   },
   {
+    id: 'azure-api-key',
+    pattern: /AccountKey=[a-zA-Z0-9+\/=]{60,100}/,
+    message: 'Azure Storage Account Key',
+    severity: 'critical',
+    category: 'Azure',
+  },
+  {
+    id: 'gcp-api-key',
+    pattern: /AIza[0-9A-Za-z_\-]{30,40}/,
+    message: 'GCP API Key',
+    severity: 'critical',
+    category: 'GCP',
+  },
+  {
+    id: 'jwt',
+    pattern: /eyJ[a-zA-Z0-9_-]{10,}\.eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}/,
+    message: 'JSON Web Token (JWT)',
+    severity: 'high',
+    category: 'Authentication',
+  },
+  {
     id: 'aws-secret-key',
     pattern:
       /(aws[a-z0-9_ .\-,]{0,25})(=|>|:=|\|\|:|<=|=>|:).{0,5}[0-9a-zA-Z\/+]{40}/i,
@@ -500,6 +521,13 @@ export const SENSITIVE_PATTERNS: RegexRule[] = [
     category: 'Ionic',
   },
   {
+    id: 'ionic-api-token-standalone',
+    pattern: /\bion_[a-z0-9]{42}\b/i,
+    message: 'Ionic API Token (standalone)',
+    severity: 'critical',
+    category: 'Ionic',
+  },
+  {
     id: 'linear-api-token',
     pattern: /lin_api_[a-z0-9]{40}/i,
     message: 'Linear API Token',
@@ -527,6 +555,20 @@ export const SENSITIVE_PATTERNS: RegexRule[] = [
     pattern:
       /(lob[a-z0-9_ .\-,]{0,25})(=|>|:=|\|\|:|<=|=>|:).{0,5}['"]((test|live)_pub_[a-f0-9]{31})['"]/i,
     message: 'Lob Publishable API Key',
+    severity: 'critical',
+    category: 'Lob',
+  },
+  {
+    id: 'lob-api-key-standalone',
+    pattern: /((live|test)_[a-f0-9]{35})/i,
+    message: 'Lob API Key (standalone)',
+    severity: 'critical',
+    category: 'Lob',
+  },
+  {
+    id: 'lob-pub-api-key-standalone',
+    pattern: /((test|live)_pub_[a-f0-9]{31})/i,
+    message: 'Lob Publishable API Key (standalone)',
     severity: 'critical',
     category: 'Lob',
   },
@@ -703,9 +745,17 @@ export const SENSITIVE_PATTERNS: RegexRule[] = [
     category: 'Typeform',
   },
   {
+    id: 'database-connection-uri',
+    pattern:
+      /(redis|postgres|postgresql|mysql|mongodb|amqp):\/\/[^:]*:([^@]+)@/,
+    message: 'Database Connection String with Password',
+    severity: 'high',
+    category: 'Database',
+  },
+  {
     id: 'generic-api-key',
     pattern:
-      /((key|api[^Version]|token|secret|password)[a-z0-9_ .\-,]{0,25})(=|>|:=|\|\|:|<=|=>|:).{0,5}['"]([0-9a-zA-Z\-_=]{8,64})['"]/i,
+      /((key|api[^Version]|token|secret|password)[a-z0-9_ .\-,]{0,25})(=|>|:=|\|\|:|<=|=>|:).{0,5}['"]([0-9a-zA-Z\-_=!.?@#$%^&*]{8,64})['"]/i,
     message: 'Generic API Key',
     severity: 'high',
     category: 'Generic',

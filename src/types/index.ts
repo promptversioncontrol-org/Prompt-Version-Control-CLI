@@ -6,6 +6,7 @@ export interface PVCConfig {
   lastSessionId: string;
   userId: string;
   username: string;
+  workspaceId: string;
 }
 
 export interface FileEdit {
