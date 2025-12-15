@@ -1,0 +1,25 @@
+# -- Folders --
+node_modules
+dist
+build
+.git
+.pvc
+coverage
+tmp
+temp
+logs
+
+# -- Files --
+.env
+.env.*
+id_rsa
+id_rsa.pub
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+*.log
+*.bak
+*.swp
+.DS_Store

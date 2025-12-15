@@ -388,10 +388,7 @@ function showHelp() {
 Usage:
   pvc init                                      Initialize PVC in current directory
   pvc update-conv                               Save last Codex session ID to config
-  pvc generate -m "<name>"                      Generate report using lastSessionId
-  pvc generate -id <sessionId> -m "<name>"      Generate report for specific session
-  pvc generate -last [N] -m "<name>"            Use last N user/assistant messages
-
+  
   pvc remote add <url>                          Add remote repository URL
   pvc remote -v                                 Show current remote URL
   pvc remote remove                             Remove remote URL from config
@@ -406,8 +403,6 @@ Usage:
 Examples:
   pvc init
   pvc update-conv
-  pvc generate -m "initial-setup"
-  pvc generate -id 019a98c7-eb23-7951-b8e7-30a6b38dceb8 -m "feature-auth"
   pvc remote add https://github.com/user/repo.git
   pvc remote -v
   pvc remote remove

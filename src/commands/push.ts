@@ -75,6 +75,14 @@ export async function pushCommand(cwd: string): Promise<void> {
     process.exit(1);
   }
 
+  // Ensure workspaceId is present
+  if (!config.workspaceId) {
+    console.error(
+      "❌ Workspace ID not found in config. Run 'pvc remote add <url>' again to resolve it.",
+    );
+    process.exit(1);
+  }
+
   const dailyDir = getDailyReportDir(cwd, sessionId);
   if (!existsSync(dailyDir)) {
     console.log('ℹ️  No reports found for today.');
@@ -90,7 +98,7 @@ export async function pushCommand(cwd: string): Promise<void> {
   }
 
   console.log(`📂 Scanning folder: ${dateStr}`);
-  console.log(`🔗 Workspace: ${workspaceName}`);
+  console.log(`🔗 Workspace ID: ${config.workspaceId}`);
 
   let uploaded = 0;
   let skipped = 0;
@@ -99,7 +107,10 @@ export async function pushCommand(cwd: string): Promise<void> {
   for (const file of files) {
     const filePath = path.join(dailyDir, file);
     console.log('filePath', filePath);
-    const fileKey = `pvc/users/${config.userId}/workspaces/${workspaceName}/${dateStr}/${file}`;
+
+    // NEW KEY STRUCTURE: pvc/workspaces/{workspaceId}/{userId}/{date}/{file}
+    const fileKey = `pvc/workspaces/${config.workspaceId}/${config.userId}/${dateStr}/${file}`;
+
     console.log('fileKey', fileKey);
     try {
       const localHash = calculateMD5(filePath);

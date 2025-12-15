@@ -1,0 +1,31 @@
+# -- Folders --
+build
+dist
+bin
+obj
+lib
+.git
+.pvc
+.vscode
+.idea
+
+# -- Files --
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+*.pdb
+*.idb
+*.ilk
+*.exp
+*.map
+.env
+.env.*
+*.pem
+*.key
+*.log
+.DS_Store

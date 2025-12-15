@@ -3,8 +3,7 @@ import path from 'path';
 import { getPVCDir } from '../utils/path-utils';
 
 export interface FileSensitivityConfig {
-  folderPatterns: RegExp[];
-  filePatterns: RegExp[];
+  patterns: RegExp[];
 }
 
 function loadLines(filePath: string): string[] {
@@ -54,17 +53,11 @@ function globToRegex(pattern: string): RegExp {
 
 export function loadFileSensitivityConfig(cwd: string): FileSensitivityConfig {
   const pvcDir = getPVCDir(cwd);
-  const sensitiveDir = path.join(pvcDir, 'sensitive');
+  const rulesDir = path.join(pvcDir, 'rules');
+  const rulesFile = path.join(rulesDir, 'pvc.rules');
 
-  const foldersFile = path.join(sensitiveDir, 'folders.rules');
-  const commonFile = path.join(sensitiveDir, 'files.common.rules');
-  const customFile = path.join(sensitiveDir, 'files.custom.rules');
+  const lines = loadLines(rulesFile);
+  const patterns = lines.map(globToRegex);
 
-  const folderLines = loadLines(foldersFile);
-  const fileLines = [...loadLines(commonFile), ...loadLines(customFile)];
-
-  const folderPatterns = folderLines.map(globToRegex);
-  const filePatterns = fileLines.map(globToRegex);
-
-  return { folderPatterns, filePatterns };
+  return { patterns };
 }

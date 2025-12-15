@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import path from 'path';
 import { getPVCDir, getReportsDir, getConfigPath } from '../utils/path-utils';
 import type { PVCConfig } from '../types';
 
@@ -30,6 +31,39 @@ export function initCommand(cwd: string): void {
     mkdirSync(reportsDir, { recursive: true });
   }
 
+  // Create rules directory and default file
+  const rulesDir = path.join(pvcDir, 'rules');
+  if (!existsSync(rulesDir)) {
+    mkdirSync(rulesDir, { recursive: true });
+  }
+
+  const rulesContent = [
+    '# -- Folders --',
+    'node_modules',
+    'dist',
+    'build',
+    '.git',
+    '.pvc',
+    'coverage',
+    '',
+    '# -- Files --',
+    '.env',
+    '.env.*',
+    'id_rsa',
+    'id_rsa.pub',
+    '*.pem',
+    '*.key',
+    '*.p12',
+    '*.pfx',
+    '*.keystore',
+  ].join('\n');
+
+  const rulesPath = path.join(rulesDir, 'pvc.rules');
+  if (!existsSync(rulesPath)) {
+    writeFileSync(rulesPath, rulesContent);
+  }
+
   console.log('✔ PVC initialized');
   console.log(`Created: ${pvcDir}`);
+  console.log(`Rules generated in: ${rulesPath}`);
 }

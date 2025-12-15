@@ -12,28 +12,28 @@ export function isSensitivePath(
   const normalized = filePath.replace(/\\/g, '/');
   const fileName = normalized.split('/').pop() || '';
 
-  // 1) Check file patterns against filename
-  for (let i = 0; i < cfg.filePatterns.length; i++) {
-    const pattern = cfg.filePatterns[i];
+  // 1) Check patterns against filename
+  for (let i = 0; i < cfg.patterns.length; i++) {
+    const pattern = cfg.patterns[i];
     if (pattern.test(fileName)) {
       return true;
     }
   }
 
-  // 2) Check file patterns against full path
-  for (let i = 0; i < cfg.filePatterns.length; i++) {
-    const pattern = cfg.filePatterns[i];
+  // 2) Check patterns against full path
+  for (let i = 0; i < cfg.patterns.length; i++) {
+    const pattern = cfg.patterns[i];
     if (pattern.test(normalized)) {
       return true;
     }
   }
 
-  // 3) Check folder patterns
+  // 3) Check patterns against path parts (folders)
   const pathParts = normalized.split('/').filter((p) => p);
 
   for (const part of pathParts) {
-    for (let i = 0; i < cfg.folderPatterns.length; i++) {
-      const pattern = cfg.folderPatterns[i];
+    for (let i = 0; i < cfg.patterns.length; i++) {
+      const pattern = cfg.patterns[i];
       if (pattern.test(part)) {
         return true;
       }

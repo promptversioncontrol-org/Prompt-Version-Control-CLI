@@ -34,6 +34,7 @@ import {
   getBlockedLogPath,
 } from '../utils/blocked-prompts';
 import { RealTimeReporter } from '../utils/socket-client';
+import { pushCommand } from './push';
 
 interface PVCConfigFile {
   remote?: { url?: string };
@@ -612,19 +613,15 @@ async function stopDaemon(cwd: string): Promise<void> {
     // ignore
   }
 
-  // After stopping, try to upload the latest report (if exists)
-  // if (sessionId) {
-  //   const watchDir = getExistingWatchDir(cwd, sessionId);
-  //   if (watchDir) {
-  //     const jsonPath = path.join(watchDir, "report.json");
-  //     const mdPath = path.join(watchDir, "report.md");
-  //     if (existsSync(jsonPath) && existsSync(mdPath)) {
-  //       await sendToBackend(cwd, sessionId, jsonPath, mdPath);
-  //     }
-  //     clearWatchDir(cwd, sessionId);
-  //     console.log("🗑️  Watch session finalized - next watch will create new folder");
-  //   }
-  // }
+  // Automatically push reports to S3 after stopping
+  try {
+    console.log('\n🚀 Auto-pushing reports to S3...');
+    await pushCommand(cwd);
+  } catch (error) {
+    console.error(
+      `❌ Failed to auto-push reports: ${(error as Error).message}`,
+    );
+  }
 }
 
 export async function watchCommand(cwd: string, args: string[]): Promise<void> {

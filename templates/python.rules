@@ -1,0 +1,27 @@
+# -- Folders --
+__pycache__
+venv
+.venv
+env
+.env
+.git
+.pvc
+.pytest_cache
+.mypy_cache
+dist
+build
+eggs
+.eggs
+
+# -- Files --
+.env
+.env.*
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+*.pem
+*.key
+*.log
+.DS_Store
