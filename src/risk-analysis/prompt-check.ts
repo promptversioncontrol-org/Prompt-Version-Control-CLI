@@ -1,5 +1,5 @@
-import type { SensitiveScanResult, RiskFinding } from '../types';
-import { SENSITIVE_PATTERNS } from './gitleaks-rules';
+import type { SensitiveScanResult, RiskFinding } from '../types/index.js';
+import { SENSITIVE_PATTERNS } from './gitleaks-rules.js';
 
 export function scanTextForSensitiveData(
   text: string,

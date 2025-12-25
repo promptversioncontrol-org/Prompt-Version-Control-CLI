@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from 'fs';
 import path from 'path';
-import { getPVCDir } from '../utils/path-utils';
+import { getPVCDir } from '../utils/path-utils.js';
 
 export interface FileSensitivityConfig {
   patterns: RegExp[];

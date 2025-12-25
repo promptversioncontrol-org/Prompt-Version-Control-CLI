@@ -1,18 +1,17 @@
 #!/usr/bin/env bun
-import { initCommand, generateReportCommand } from './commands';
-import { watchCommand } from './commands';
-import {
-  readFileSync,
-  writeFileSync,
-  existsSync,
-  readdirSync,
-  statSync,
-} from 'fs';
+import { initCommand, generateReportCommand } from './commands/index.js';
+import { watchCommand } from './commands/index.js';
+import { readdirSync, statSync, existsSync } from 'fs';
 import path from 'path';
-import { getCodexSessionsRoot } from './utils/path-utils';
-import { loginSSHCommand } from './commands/login';
-import { pushCommand } from './commands/push';
-import { ENV } from './config/env';
+import { getCodexSessionsRoot } from './utils/path-utils.js';
+import { loginSSHCommand } from './commands/login.js';
+import { pushCommand } from './commands/push.js';
+import { ENV } from './config/env.js';
+import { ConfigManager } from './utils/config-manager.js';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+const pkg = require('../package.json');
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -28,27 +27,6 @@ function ensurePVC() {
   return pvcDir;
 }
 
-function getConfig(pvcDir: string) {
-  const configPath = path.join(pvcDir, 'config.json');
-  if (!existsSync(configPath)) {
-    console.error('❌ Config file not found.');
-    process.exit(1);
-  }
-  const config = JSON.parse(readFileSync(configPath, 'utf8'));
-  if (config.lastSessionId === undefined) {
-    config.lastSessionId = '';
-  }
-  if (!config.remote) {
-    config.remote = { url: '' };
-  }
-  return config;
-}
-
-function saveConfig(pvcDir: string, config: any) {
-  const configPath = path.join(pvcDir, 'config.json');
-  writeFileSync(configPath, JSON.stringify(config, null, 2));
-}
-
 async function main() {
   try {
     switch (command) {
@@ -56,9 +34,15 @@ async function main() {
         initCommand(cwd);
         break;
 
+      case '-v':
+      case 'version':
+        console.log(`v${pkg.version}`);
+        break;
+
       case 'update-conv': {
-        const pvcDir = ensurePVC();
-        const config = getConfig(pvcDir);
+        ensurePVC();
+        // Read local to update it
+        const config = ConfigManager.getLocalConfig(cwd);
 
         const sessionsRoot = getCodexSessionsRoot();
         if (!sessionsRoot) {
@@ -120,7 +104,7 @@ async function main() {
         }
 
         // Prefer sessionId parsed from filename timestamp; fall back to suffix-only parsing
-        let lastSessionId = latestSessionId;
+        let lastSessionId: string | null = latestSessionId;
         const latestName = path.basename(latestPath);
         if (!lastSessionId) {
           const match = latestName.match(/.*-([0-9a-fA-F-]{36})\.jsonl$/);
@@ -135,7 +119,7 @@ async function main() {
         }
 
         config.lastSessionId = lastSessionId;
-        saveConfig(pvcDir, config);
+        ConfigManager.saveLocalConfig(cwd, config);
 
         console.log('✅ Updated lastSessionId in config.json');
         console.log(`🔗 Session ID: ${lastSessionId}`);
@@ -143,7 +127,7 @@ async function main() {
       }
 
       case 'remote': {
-        const pvcDir = ensurePVC();
+        ensurePVC();
 
         if (subcommand === 'add') {
           const url = args[2];
@@ -177,7 +161,7 @@ async function main() {
               workspaceSlug: string;
             };
 
-            const config = getConfig(pvcDir);
+            const config = ConfigManager.getLocalConfig(cwd);
 
             if (!config.remote) {
               config.remote = {};
@@ -185,7 +169,7 @@ async function main() {
 
             config.remote.url = url;
             config.workspaceId = data.id; // Save workspace ID
-            saveConfig(pvcDir, config);
+            ConfigManager.saveLocalConfig(cwd, config);
 
             console.log('✅ Remote added');
             console.log(`🔗 URL: ${url}`);
@@ -199,7 +183,7 @@ async function main() {
             process.exit(1);
           }
         } else if (subcommand === '-v' || subcommand === 'show') {
-          const config = getConfig(pvcDir);
+          const config = ConfigManager.getLocalConfig(cwd);
 
           if (config.remote && config.remote.url) {
             console.log('🔗 Remote URL:');
@@ -210,7 +194,7 @@ async function main() {
             console.log('  pvc remote add <url>');
           }
         } else if (subcommand === 'remove' || subcommand === 'rm') {
-          const config = getConfig(pvcDir);
+          const config = ConfigManager.getLocalConfig(cwd);
 
           if (config.remote && config.remote.url) {
             const oldUrl = config.remote.url;
@@ -218,7 +202,7 @@ async function main() {
             if (Object.keys(config.remote).length === 0) {
               delete config.remote;
             }
-            saveConfig(pvcDir, config);
+            ConfigManager.saveLocalConfig(cwd, config);
 
             console.log('✅ Remote removed');
             console.log(`🗑️ Removed: ${oldUrl}`);
@@ -239,8 +223,11 @@ async function main() {
       }
 
       case 'generate': {
-        const pvcDir = ensurePVC();
-        const config = getConfig(pvcDir);
+        ensurePVC();
+        // For report generation, we might need global auth (not critical if just local, but safer to combine)
+        // But generateReportCommand implementation needs analysis. Assuming it's local for now.
+        // Actually the original code read local config. We should probably keep it combined.
+        const config = ConfigManager.getCombinedConfig(cwd);
 
         const argList = args.slice(1); // after "generate"
         let sessionId: string | null = null;

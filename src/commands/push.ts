@@ -2,20 +2,10 @@ import { existsSync, readdirSync, readFileSync } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { HeadObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
-import { s3Client } from '../lib/s3-client';
-import { getConfigPath, getDailyReportDir } from '../utils/path-utils';
-import type { PVCConfig } from '../types';
-import { ENV } from '../config/env';
-
-function readConfig(cwd: string): PVCConfig | null {
-  const configPath = getConfigPath(cwd);
-  if (!existsSync(configPath)) return null;
-  try {
-    return JSON.parse(readFileSync(configPath, 'utf8')) as PVCConfig;
-  } catch {
-    return null;
-  }
-}
+import { s3Client } from '../lib/s3-client.js';
+import { getDailyReportDir } from '../utils/path-utils.js';
+import { ENV } from '../config/env.js';
+import { ConfigManager } from '../utils/config-manager.js';
 
 function calculateMD5(filePath: string): string {
   const content = readFileSync(filePath);
@@ -38,12 +28,9 @@ export async function pushCommand(cwd: string): Promise<void> {
   console.log('cwd', cwd);
   console.log('🚀 Starting smart push...');
 
-  const config = readConfig(cwd);
+  // Use combined config (global + local)
+  const config = ConfigManager.getCombinedConfig(cwd);
   console.log('config', config);
-  if (!config) {
-    console.error("❌ Config file not found. Run 'pvc init' first.");
-    process.exit(1);
-  }
 
   if (!config.userId) {
     console.error(

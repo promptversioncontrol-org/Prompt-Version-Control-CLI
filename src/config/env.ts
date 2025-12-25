@@ -1,7 +1,11 @@
 // config/env.ts
 import dotenv from 'dotenv';
-import { resolve } from 'path';
+import { resolve, dirname } from 'path';
 import { existsSync } from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Próbuj załadować z różnych lokalizacji
 const possiblePaths = [

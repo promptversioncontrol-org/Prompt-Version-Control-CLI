@@ -1,7 +1,11 @@
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import path from 'path';
-import { getPVCDir, getReportsDir, getConfigPath } from '../utils/path-utils';
-import type { PVCConfig } from '../types';
+import {
+  getPVCDir,
+  getReportsDir,
+  getConfigPath,
+} from '../utils/path-utils.js';
+import type { PVCConfig } from '../types/index.js';
 
 export function initCommand(cwd: string): void {
   const pvcDir = getPVCDir(cwd);

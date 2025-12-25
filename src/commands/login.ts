@@ -1,7 +1,8 @@
 import os from 'os';
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { execSync } from 'child_process';
 import path from 'path';
+import { ConfigManager } from '../utils/config-manager.js';
 
 interface Session {
   userId: string;
@@ -32,17 +33,17 @@ export async function loginSSHCommand(cwd: string, backendUrl: string) {
     backendUrl,
   );
 
-  // Update config.json with userId and username
-  persistUser(cwd, session.userId, session.username);
+  // Update global config with userId, username, and sessionToken
+  ConfigManager.saveGlobalConfig({
+    userId: session.userId,
+    username: session.username,
+    sessionToken: session.sessionToken,
+  });
 
   console.log('✅ Logged in as user:', session.username);
   console.log('✅ User ID:', session.userId);
   console.log('✅ Session token:', session.sessionToken);
-
-  // 5. Save session token in project folder
-  saveSessionToken(cwd, session.sessionToken);
-
-  console.log('🎉 Session saved! You are logged in.');
+  console.log('🎉 Session saved to global config! You are logged in.');
 
   return session;
 }
@@ -137,44 +138,4 @@ async function verifySignature(
     throw new Error('❌ Signature verification failed: ' + data.error);
 
   return data as Session;
-}
-
-/* ----------------------------------------------------
- *  Step 5 - Save session token locally
- * ---------------------------------------------------- */
-function saveSessionToken(cwd: string, token: string) {
-  const pvcDir = path.join(cwd, '.pvc');
-  const configPath = path.join(pvcDir, 'config.json');
-
-  if (!existsSync(pvcDir)) mkdirSync(pvcDir);
-
-  let config: any = {};
-  if (existsSync(configPath)) {
-    config = JSON.parse(readFileSync(configPath, 'utf8'));
-  }
-
-  config = { ...config, sessionToken: token };
-
-  writeFileSync(configPath, JSON.stringify(config, null, 2));
-}
-
-function persistUser(cwd: string, userId: string, username: string) {
-  const pvcDir = path.join(cwd, '.pvc');
-  const configPath = path.join(pvcDir, 'config.json');
-
-  if (!existsSync(pvcDir)) {
-    mkdirSync(pvcDir, { recursive: true });
-  }
-
-  let config: any = {};
-  if (existsSync(configPath)) {
-    try {
-      config = JSON.parse(readFileSync(configPath, 'utf8'));
-    } catch {
-      config = {};
-    }
-  }
-
-  config = { ...config, userId, username };
-  writeFileSync(configPath, JSON.stringify(config, null, 2));
 }

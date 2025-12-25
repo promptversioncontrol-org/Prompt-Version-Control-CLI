@@ -2,8 +2,8 @@ import path from 'path';
 import {
   loadFileSensitivityConfig,
   type FileSensitivityConfig,
-} from './config';
-import type { RiskFinding, SensitiveScanResult } from '../types';
+} from './config.js';
+import type { RiskFinding, SensitiveScanResult } from '../types/index.js';
 
 export function isSensitivePath(
   filePath: string,

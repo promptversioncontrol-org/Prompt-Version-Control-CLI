@@ -1,6 +1,6 @@
-import { readdirSync, existsSync } from "fs";
-import path from "path";
-import { getCodexSessionsRoot } from "./path-utils";
+import { readdirSync, existsSync } from 'fs';
+import path from 'path';
+import { getCodexSessionsRoot } from './path-utils.js';
 
 export function findCodexSessionFile(sessionId: string): string | null {
   const codexRoot = getCodexSessionsRoot();
@@ -23,8 +23,8 @@ export function findCodexSessionFile(sessionId: string): string | null {
 
       // Check if file matches pattern: rollout-*.jsonl and contains sessionId
       if (
-        entry.name.startsWith("rollout-") &&
-        entry.name.endsWith(".jsonl") &&
+        entry.name.startsWith('rollout-') &&
+        entry.name.endsWith('.jsonl') &&
         entry.name.includes(sessionId)
       ) {
         foundFile = fullPath;
@@ -38,4 +38,3 @@ export function findCodexSessionFile(sessionId: string): string | null {
   walkDirectory(codexRoot);
   return foundFile;
 }
-

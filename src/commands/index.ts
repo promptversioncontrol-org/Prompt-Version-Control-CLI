@@ -1,3 +1,3 @@
-export { initCommand } from "./init";
-export { generateReportCommand } from "./generate-report";
-export { watchCommand } from "./watch";
+export { initCommand } from './init.js';
+export { generateReportCommand } from './generate-report.js';
+export { watchCommand } from './watch.js';

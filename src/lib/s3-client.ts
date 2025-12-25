@@ -1,6 +1,6 @@
 // lib/s3-client.ts
 import { S3Client } from '@aws-sdk/client-s3';
-import { ENV } from '../config/env';
+import { ENV } from '../config/env.js';
 
 const credentials =
   ENV.AWS_ACCESS_KEY_ID && ENV.AWS_SECRET_ACCESS_KEY

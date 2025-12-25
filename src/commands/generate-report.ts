@@ -1,6 +1,6 @@
 import { writeFileSync, existsSync, mkdirSync } from 'fs';
 import path from 'path';
-import { findCodexSessionFile } from '../utils/file-finder';
+import { findCodexSessionFile } from '../utils/file-finder.js';
 import {
   parseJSONLFile,
   extractUserPrompts,
@@ -9,32 +9,32 @@ import {
   extractShellCommands,
   extractPatches,
   extractFileEdits,
-} from '../utils/jsonl-parser';
-import { generateMarkdownReport } from '../generators/markdown-generator';
-import { generateJSONReport } from '../generators/json-generator';
+} from '../utils/jsonl-parser.js';
+import { generateMarkdownReport } from '../generators/markdown-generator.js';
+import { generateJSONReport } from '../generators/json-generator.js';
 import {
   getReportsDir,
   ensureDirectoryExists,
   getPVCDir,
   getReportDir,
-} from '../utils/path-utils';
+} from '../utils/path-utils.js';
 import {
   loadCheckpoint,
   saveCheckpoint,
   getLastTimestamp,
-} from '../utils/checkpoint';
+} from '../utils/checkpoint.js';
 import type {
   SessionReport,
   GenerateReportResult,
   RiskSummary,
   RiskFinding,
-} from '../types';
+} from '../types/index.js';
 import {
   loadRiskRules,
   analyzeRisks,
   analyzePromptRealtime,
   scanFileForSensitiveData,
-} from '../risk-analysis/index';
+} from '../risk-analysis/index.js';
 
 interface GenerateOptions {
   lastCount?: number;

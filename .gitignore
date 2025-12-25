@@ -6,6 +6,7 @@ bun.lockb
 pvc
 pvc.exe
 *.exe
+dist/
 
 # PVC data
 .pvc/
@@ -44,3 +45,4 @@ key.json
 /src/test
 
 /src/generated/prisma
+*.p12

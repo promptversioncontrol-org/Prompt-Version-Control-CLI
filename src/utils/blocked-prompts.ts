@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import { getPVCDir } from './path-utils';
-import type { RiskFinding } from '../types';
+import { getPVCDir } from './path-utils.js';
+import type { RiskFinding } from '../types/index.js';
 
 export interface BlockedPromptEvent {
   sessionId: string;

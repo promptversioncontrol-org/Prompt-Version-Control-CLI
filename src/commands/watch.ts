@@ -8,51 +8,38 @@ import {
 } from 'fs';
 import path from 'path';
 import { spawn, spawnSync } from 'child_process';
-import { findCodexSessionFile } from '../utils/file-finder';
+import { findCodexSessionFile } from '../utils/file-finder.js';
 import {
   getPVCDir,
-  getConfigPath,
   getReportsDir,
   getDailyReportDir,
-} from '../utils/path-utils';
+} from '../utils/path-utils.js';
 import {
   parseJSONLFile,
   extractUserPrompts,
   extractAssistantMessages,
   extractFileEdits,
-} from '../utils/jsonl-parser';
-import { generateMarkdownReport } from '../generators/markdown-generator';
+} from '../utils/jsonl-parser.js';
+import { generateMarkdownReport } from '../generators/markdown-generator.js';
 import {
   loadCheckpoint,
   saveCheckpoint,
   getLastTimestamp,
-} from '../utils/checkpoint';
-import type { SessionReport } from '../types';
+} from '../utils/checkpoint.js';
+import type { SessionReport } from '../types/index.js';
 
 import {
   loadBlockedPromptsForSession,
   getBlockedLogPath,
-} from '../utils/blocked-prompts';
-import { RealTimeReporter } from '../utils/socket-client';
-import { pushCommand } from './push';
-import { prisma } from '../lib/prisma';
+} from '../utils/blocked-prompts.js';
+import { RealTimeReporter } from '../utils/socket-client.js';
+import { pushCommand } from './push.js';
+import { prisma } from '../lib/prisma.js';
+import { ConfigManager } from '../utils/config-manager.js';
 
-interface PVCConfigFile {
-  remote?: { url?: string };
-  lastSessionId?: string;
-  sessionToken?: string;
-  workspaceId?: string;
-  username?: string;
-}
-
-function readConfig(cwd: string): PVCConfigFile {
-  const configPath = getConfigPath(cwd);
-  if (!existsSync(configPath)) return {};
-  try {
-    return JSON.parse(readFileSync(configPath, 'utf8')) as PVCConfigFile;
-  } catch {
-    return {};
-  }
+// Simplified wrapper using ConfigManager
+function readConfig(cwd: string) {
+  return ConfigManager.getCombinedConfig(cwd);
 }
 
 function getPidPath(cwd: string): string {
@@ -615,6 +602,7 @@ async function syncSecurityRules(cwd: string, workspaceId: string) {
       content += folders.join('\n') + '\n';
     }
 
+    // 1. Sync to local .pvc/rules
     const rulesDir = path.join(getPVCDir(cwd), 'rules');
     if (!existsSync(rulesDir)) {
       mkdirSync(rulesDir, { recursive: true });
@@ -623,6 +611,16 @@ async function syncSecurityRules(cwd: string, workspaceId: string) {
     const rulesPath = path.join(rulesDir, 'pvc.rules');
     writeFileSync(rulesPath, content, 'utf-8');
     console.log(`✅ Security rules synced to ${rulesPath}`);
+
+    // 2. Sync to C:\ProgramData\PVC\rules (for Proxy)
+    const programDataRulesDir = path.join('C:', 'ProgramData', 'PVC', 'rules');
+    if (!existsSync(programDataRulesDir)) {
+      mkdirSync(programDataRulesDir, { recursive: true });
+    }
+
+    const programDataRulesPath = path.join(programDataRulesDir, 'pvc.rules');
+    writeFileSync(programDataRulesPath, content, 'utf-8');
+    console.log(`✅ Security rules synced to ${programDataRulesPath}`);
   } catch (error) {
     console.error('❌ Failed to sync security rules:', error);
   }

@@ -1,4 +1,4 @@
-import type { SessionReport, FileEdit, RiskFinding } from '../types';
+import type { SessionReport, FileEdit, RiskFinding } from '../types/index.js';
 
 interface DiffLine {
   type: 'unchanged' | 'removed' | 'added';
@@ -298,8 +298,11 @@ function createCompactDiff(oldContent: string, newContent: string): string {
   return html;
 }
 
-export function generateMarkdownReport(report: SessionReport): string {
-  let md = `# PVC Report - Session ${report.sessionId}\n\n`;
+export function generateMarkdownReport(
+  report: SessionReport,
+  reportName?: string,
+): string {
+  let md = `# PVC Report - ${reportName ? `${reportName} (${report.sessionId})` : `Session ${report.sessionId}`}\n\n`;
   md += `**Generated at:** ${report.generatedAt}\n`;
   md += `**Working Directory:** \`${report.cwd}\`\n\n`;
   md += `---\n\n`;

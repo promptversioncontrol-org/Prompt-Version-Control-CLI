@@ -1,4 +1,4 @@
-import { checkPromptBeforeSend } from './risk-analysis/index';
+import { checkPromptBeforeSend } from './risk-analysis/index.js';
 import path from 'path';
 
 // This script simulates a client application (like an IDE plugin or a chatbot)
@@ -26,7 +26,7 @@ if (!result.allowed) {
   console.error('\n⛔ BLOCKED! The prompt contains sensitive data.');
   console.error('   Risk Score:', result.riskScore);
   console.error('   Findings:');
-  result.findings.forEach((f) => {
+  result.findings.forEach((f: any) => {
     console.error(
       `   - [${f.severity.toUpperCase()}] ${f.ruleId}: ${f.message}`,
     );

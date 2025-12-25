@@ -6,7 +6,7 @@ import type {
   ShellCommand,
   Patch,
   FileEdit,
-} from '../types';
+} from '../types/index.js';
 
 // ========================================
 // FINALNA WERSJA - parseAugmentedPrompt

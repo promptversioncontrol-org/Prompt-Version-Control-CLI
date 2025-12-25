@@ -1,41 +1,29 @@
 {
-  "name": "pvc",
-  "version": "1.0.0",
-  "description": "Prompt Version Control - Track and analyze AI coding sessions",
-  "main": "src/index.ts",
+  "name": "@adam903/pvc",
+  "version": "1.0.5",
   "type": "module",
-  "scripts": {
-    "start": "bun src/index.ts",
-    "build": "bun build.ts",
-    "build:windows": "bun build ./src/index.ts --compile --target=bun-windows-x64 --outfile=pvc.exe",
-    "build:linux": "bun build ./src/index.ts --compile --target=bun-linux-x64 --outfile=pvc",
-    "build:mac": "bun build ./src/index.ts --compile --target=bun-darwin-x64 --outfile=pvc",
-    "prepare": "husky"
+  "bin": {
+    "pvc": "./bin/pvc.js"
   },
-  "keywords": [
-    "pvc",
-    "version-control",
-    "ai",
-    "codex"
+  "files": [
+    "bin",
+    "dist",
+    "prisma",
+    "README.md"
   ],
-  "author": "Adam Pukaluk",
-  "license": "MIT",
+  "scripts": {
+    "build": "tsc",
+    "postinstall": "prisma generate"
+  },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.940.0",
     "@aws-sdk/s3-request-presigner": "^3.940.0",
-    "@commitlint/config-conventional": "^20.0.0",
     "@prisma/client": "^6.19.0",
     "dotenv": "^17.2.3",
     "prisma": "^6.19.0",
     "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
-    "@commitlint/cli": "^20.1.0",
-    "@types/node": "^24.10.1",
-    "@typescript-eslint/eslint-plugin": "^8.48.0",
-    "@typescript-eslint/parser": "^8.48.0",
-    "eslint": "^9.39.1",
-    "husky": "^9.1.7",
-    "prettier": "^3.7.1"
+    "typescript": "^5.4.0"
   }
 }

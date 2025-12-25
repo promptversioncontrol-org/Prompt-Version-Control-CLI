@@ -1,8 +1,8 @@
 import path from 'path';
 import { existsSync } from 'fs';
-import { loadFileSensitivityConfig } from './config';
-import { scanFileForSensitiveData, isSensitivePath } from './file-check';
-import { scanTextForSensitiveData } from './prompt-check';
+import { loadFileSensitivityConfig } from './config.js';
+import { scanFileForSensitiveData, isSensitivePath } from './file-check.js';
+import { scanTextForSensitiveData } from './prompt-check.js';
 import type {
   RiskRule,
   UserPrompt,
@@ -10,7 +10,7 @@ import type {
   FileEdit,
   AnalyzeResult,
   SensitiveScanResult,
-} from '../types';
+} from '../types/index.js';
 
 export interface PromptRiskResult extends SensitiveScanResult {
   promptText: string;
