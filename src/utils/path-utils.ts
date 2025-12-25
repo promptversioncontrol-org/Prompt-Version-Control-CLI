@@ -28,8 +28,6 @@ export function ensureDirectoryExists(dirPath: string): void {
 }
 export function getDailyReportDir(cwd: string, sessionId: string): string {
   const reportsRootDir = getReportsDir(cwd);
-  const sessionReportsDir = path.join(reportsRootDir, sessionId);
-
   // Create folder name based on current UTC date: YYYY-MM-DD
   const now = new Date();
   const year = now.getUTCFullYear();
@@ -37,8 +35,8 @@ export function getDailyReportDir(cwd: string, sessionId: string): string {
   const day = String(now.getUTCDate()).padStart(2, '0');
   const dateStr = `${year}-${month}-${day}`;
 
-  const dailyDir = path.join(sessionReportsDir, dateStr);
-  return dailyDir;
+  const sessionReportsDir = path.join(reportsRootDir, dateStr, sessionId);
+  return sessionReportsDir;
 }
 
 export function getReportDir(

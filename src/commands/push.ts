@@ -89,7 +89,7 @@ export async function pushCommand(cwd: string): Promise<void> {
     return;
   }
 
-  const dateStr = path.basename(dailyDir); // e.g., 2025-11-27
+  const dateStr = path.basename(path.dirname(dailyDir)); // e.g., 2025-11-27
   const files = readdirSync(dailyDir).filter((f) => !f.startsWith('.'));
   console.log('files', files);
   if (files.length === 0) {
@@ -97,7 +97,7 @@ export async function pushCommand(cwd: string): Promise<void> {
     return;
   }
 
-  console.log(`📂 Scanning folder: ${dateStr}`);
+  console.log(`📂 Scanning folder: ${dateStr}/${sessionId}`);
   console.log(`🔗 Workspace ID: ${config.workspaceId}`);
 
   let uploaded = 0;
@@ -108,8 +108,8 @@ export async function pushCommand(cwd: string): Promise<void> {
     const filePath = path.join(dailyDir, file);
     console.log('filePath', filePath);
 
-    // NEW KEY STRUCTURE: pvc/workspaces/{workspaceId}/{userId}/{date}/{file}
-    const fileKey = `pvc/workspaces/${config.workspaceId}/${config.userId}/${dateStr}/${file}`;
+    // NEW KEY STRUCTURE: pvc/workspaces/{workspaceId}/{userId}/{date}/{sessionId}/{file}
+    const fileKey = `pvc/workspaces/${config.workspaceId}/${config.userId}/${dateStr}/${sessionId}/${file}`;
 
     console.log('fileKey', fileKey);
     try {

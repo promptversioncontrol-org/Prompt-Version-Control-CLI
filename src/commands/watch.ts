@@ -28,13 +28,14 @@ import {
   getLastTimestamp,
 } from '../utils/checkpoint';
 import type { SessionReport } from '../types';
-import { loadRiskRules, analyzeRisks } from '../risk-analysis/index';
+
 import {
   loadBlockedPromptsForSession,
   getBlockedLogPath,
 } from '../utils/blocked-prompts';
 import { RealTimeReporter } from '../utils/socket-client';
 import { pushCommand } from './push';
+import { prisma } from '../lib/prisma';
 
 interface PVCConfigFile {
   remote?: { url?: string };
@@ -122,11 +123,11 @@ async function updateReports(
   sessionFile: string,
   reporter: RealTimeReporter,
   username: string,
+  workspaceId?: string,
 ) {
   console.log('\n🔥 ========== UPDATE REPORTS START ========== 🔥');
 
-  const reportsRootDir = getReportsDir(cwd);
-  const sessionReportsDir = path.join(reportsRootDir, sessionId);
+  const sessionReportsDir = getDailyReportDir(cwd, sessionId);
 
   if (!existsSync(sessionReportsDir)) {
     mkdirSync(sessionReportsDir, { recursive: true });
@@ -206,7 +207,7 @@ async function updateReports(
 
     if (res.findings.length > 0) {
       console.log(`\n⚠️  Risk detected in prompt:`);
-      res.findings.forEach((f) => {
+      for (const f of res.findings) {
         const icon =
           f.severity === 'high' ? '🔴' : f.severity === 'medium' ? '🟠' : '🟡';
         console.log(`   ${icon} [${f.severity}] ${f.ruleId}: ${f.message}`);
@@ -221,7 +222,41 @@ async function updateReports(
           timestamp: new Date().toISOString(),
           username,
         });
-      });
+
+        if (workspaceId) {
+          try {
+            const existingLeak = await prisma.workspaceLeak.findFirst({
+              where: {
+                workspaceId,
+                sessionId,
+                ruleId: f.ruleId,
+                snippet: f.snippet,
+              },
+            });
+
+            if (!existingLeak) {
+              await prisma.workspaceLeak.create({
+                data: {
+                  workspaceId,
+                  severity: f.severity,
+                  message: f.message,
+                  snippet: f.snippet,
+                  source: 'prompt',
+                  username,
+                  ruleId: f.ruleId,
+                  sessionId,
+                  detectedAt: new Date(),
+                },
+              });
+              console.log('   💾 Leak saved to DB');
+            } else {
+              console.log('   ⏭️  Leak already exists in DB');
+            }
+          } catch (error) {
+            console.error('   ❌ Failed to save leak to DB:', error);
+          }
+        }
+      }
     }
   }
 
@@ -232,7 +267,7 @@ async function updateReports(
 
     if (res.findings.length > 0) {
       console.log(`\n⚠️  Risk detected in file: ${edit.path}`);
-      res.findings.forEach((f) => {
+      for (const f of res.findings) {
         const icon =
           f.severity === 'high' ? '🔴' : f.severity === 'medium' ? '🟠' : '🟡';
         console.log(`   ${icon} [${f.severity}] ${f.ruleId}: ${f.message}`);
@@ -247,7 +282,41 @@ async function updateReports(
           timestamp: new Date().toISOString(),
           username,
         });
-      });
+
+        if (workspaceId) {
+          try {
+            const existingLeak = await prisma.workspaceLeak.findFirst({
+              where: {
+                workspaceId,
+                sessionId,
+                ruleId: f.ruleId,
+                snippet: f.snippet,
+              },
+            });
+
+            if (!existingLeak) {
+              await prisma.workspaceLeak.create({
+                data: {
+                  workspaceId,
+                  severity: f.severity,
+                  message: f.message,
+                  snippet: f.snippet,
+                  source: 'file',
+                  username,
+                  ruleId: f.ruleId,
+                  sessionId,
+                  detectedAt: new Date(),
+                },
+              });
+              console.log('   💾 Leak saved to DB');
+            } else {
+              console.log('   ⏭️  Leak already exists in DB');
+            }
+          } catch (error) {
+            console.error('   ❌ Failed to save leak to DB:', error);
+          }
+        }
+      }
     }
   }
 
@@ -411,50 +480,6 @@ function createZipArchive(files: string[], cwd: string): Buffer {
   return buf;
 }
 
-async function sendToBackend(
-  cwd: string,
-  sessionId: string,
-  jsonPath: string,
-  mdPath: string,
-) {
-  const cfg = readConfig(cwd);
-  const endpoint = cfg.remote?.url;
-
-  if (!endpoint) {
-    console.log('ℹ️ No backend URL configured (remote.url). Skipping upload.');
-    return;
-  }
-
-  try {
-    const zipBuffer = createZipArchive([jsonPath, mdPath], cwd);
-
-    const form = new (globalThis as any).FormData();
-    form.append('sessionId', sessionId);
-    form.append('cwd', cwd);
-    form.append('timestamp', new Date().toISOString());
-    form.append(
-      'uploadedFile',
-      new (globalThis as any).Blob([zipBuffer], { type: 'application/zip' }),
-      `watch-${sessionId}.zip`,
-    );
-
-    const response = await fetch('http://localhost:3000/api/files/upload', {
-      method: 'POST',
-      body: form,
-    });
-
-    if (response.ok) {
-      console.log('✅ Report uploaded to backend');
-    } else {
-      console.error(
-        `❌ Backend error ${response.status}: ${await response.text()}`,
-      );
-    }
-  } catch (error) {
-    console.error('❌ Failed to send to backend:', error);
-  }
-}
-
 async function runWatchLoop(
   cwd: string,
   sessionId: string,
@@ -490,6 +515,10 @@ async function runWatchLoop(
   let lastBlockedMtime = 0;
   let notFoundCount = 0;
 
+  if (config.workspaceId) {
+    await syncSecurityRules(cwd, config.workspaceId);
+  }
+
   while (true) {
     try {
       const sessionFile = findCodexSessionFile(sessionId);
@@ -521,6 +550,7 @@ async function runWatchLoop(
           sessionFile,
           reporter,
           config.username || 'unknown',
+          config.workspaceId,
         );
         console.log('');
       }
@@ -549,6 +579,7 @@ async function runWatchLoop(
           sessionFile,
           reporter,
           config.username || 'unknown',
+          config.workspaceId,
         );
         console.log('');
       }
@@ -557,6 +588,43 @@ async function runWatchLoop(
     }
 
     await new Promise((r) => setTimeout(r, intervalMs));
+  }
+}
+
+async function syncSecurityRules(cwd: string, workspaceId: string) {
+  try {
+    console.log('🔄 Syncing security rules...');
+    const rules = await prisma.securityRule.findMany({
+      where: { workspaceId },
+    });
+
+    const files = rules
+      .filter((r) => r.category === 'Files')
+      .map((r) => r.pattern);
+    const folders = rules
+      .filter((r) => r.category === 'Folders')
+      .map((r) => r.pattern);
+
+    let content = '# -- Files ---\n';
+    if (files.length > 0) {
+      content += files.join('\n') + '\n';
+    }
+
+    content += '\n# -- Folders ---\n';
+    if (folders.length > 0) {
+      content += folders.join('\n') + '\n';
+    }
+
+    const rulesDir = path.join(getPVCDir(cwd), 'rules');
+    if (!existsSync(rulesDir)) {
+      mkdirSync(rulesDir, { recursive: true });
+    }
+
+    const rulesPath = path.join(rulesDir, 'pvc.rules');
+    writeFileSync(rulesPath, content, 'utf-8');
+    console.log(`✅ Security rules synced to ${rulesPath}`);
+  } catch (error) {
+    console.error('❌ Failed to sync security rules:', error);
   }
 }
 
