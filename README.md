@@ -97,6 +97,4 @@ PVC includes a built-in risk analyzer that checks for:
 
 Blocked prompts are logged locally and prevented from being sent if configured.
 
-## License
 
-MIT
